@@ -24,7 +24,7 @@ def get_or_create_material(name, base_color, roughness=0.7, metallic=0.0):
     return mat
 
 def create_box(name, size, location, material=None, parent=None):
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=location)
+    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = size
@@ -33,6 +33,7 @@ def create_box(name, size, location, material=None, parent=None):
         obj.data.materials.append(material)
     if parent:
         obj.parent = parent
+    obj.location = location
     return obj
 
 def build_farmhouse_interior():
@@ -97,7 +98,7 @@ def build_farmhouse_interior():
     create_box("Exit_Door_Frame_R", (0.12, 0.16, door_h), (door_w/2 + 0.06, room_d/2, door_h/2), mat_timber, root)
     create_box("Exit_Door_Frame_T", (door_w + 0.24, 0.16, 0.12), (0, room_d/2, door_h + 0.06), mat_timber, root)
     exit_door = create_box("exit_door_leaf", (door_w - 0.04, 0.08, door_h - 0.04), (0, room_d/2 + 0.02, door_h/2), mat_timber, root)
-    create_box("Exit_Door_Handle", (0.08, 0.06, 0.12), (door_w/2 - 0.15, room_d/2 - 0.04, 1.05), mat_iron, exit_door)
+    create_box("Exit_Door_Handle", (0.08, 0.06, 0.12), (door_w/2 - 0.15, room_d/2 - 0.04, 1.05), mat_iron, root)
 
     # 3. Fieldstone Fireplace Hearth (North Wall Center)
     h_w, h_d, h_h = 2.8, 1.4, 2.6

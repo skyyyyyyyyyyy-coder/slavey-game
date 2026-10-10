@@ -123,9 +123,35 @@ try {
       // Exit through interior front door
       exitDoor.interact(p);
       await new Promise(r => setTimeout(r, 600));
-      pass('Exit Door returns to veranda porch at (0, 1.2, -27.5)',
-        Math.abs(p.position.x - 0) < 1.0 && Math.abs(p.position.z - (-27.5)) < 1.0,
+      pass('Exit Door returns to veranda porch deck at (0, 1.55, -28.2)',
+        Math.abs(p.position.x - 0) < 1.0 && Math.abs(p.position.z - (-28.2)) < 1.0 && p.position.y >= 1.40,
         'Player at (' + p.position.x.toFixed(1) + ', ' + p.position.y.toFixed(1) + ', ' + p.position.z.toFixed(1) + ')');
+
+      // Verify smooth stair ramp collider in CollisionWorld
+      const ramps = w.world ? w.world.ramps : [];
+      const stairRamp = ramps.find(r => r.zMin < -27.0 && r.zMax > -26.5 && r.yStart >= 1.40 && r.yEnd <= 0.65);
+      pass('Smooth porch stairs ramp collider registered in CollisionWorld', !!stairRamp,
+        stairRamp ? ('z: [' + stairRamp.zMin + ', ' + stairRamp.zMax + '], y: [' + stairRamp.yStart + ', ' + stairRamp.yEnd + ']') : 'Ramp not found');
+
+      // Verify door pivot exists and is bound
+      pass('Farmhouse Door Pivot node bound', !!w.farmhouseDoorPivot);
+
+      // Verify no stray objects floating in the sky or detached outside building envelope
+      const detachedExterior = [];
+      if (w.farmhouseExteriorModel) {
+        w.farmhouseExteriorModel.traverse(c => {
+          if (c.isMesh) {
+            const wp = new THREE.Vector3();
+            c.getWorldPosition(wp);
+            // Farmhouse envelope: X in [-8.5, 8.5], Y in [0, 9.5], Z in [-40, -25]
+            if (wp.z > -25.0 || Math.abs(wp.x) > 8.5 || wp.y > 9.5) {
+              detachedExterior.push({ name: c.name, y: wp.y, z: wp.z });
+            }
+          }
+        });
+      }
+      pass('Zero stray/broken objects floating in the sky (all parts in building envelope)', detachedExterior.length === 0,
+        detachedExterior.length > 0 ? ('Detached: ' + detachedExterior.map(d => d.name + ' at y=' + d.y.toFixed(1) + ', z=' + d.z.toFixed(1)).join(', ')) : 'All 100% enclosed');
 
       // Re-enter interior for bed, fireplace, and chest testing
       p.respawn(new THREE.Vector3(160, 1.2, 161.5));

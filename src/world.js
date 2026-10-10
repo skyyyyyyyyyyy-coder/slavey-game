@@ -286,8 +286,8 @@ export class World {
         emissiveIntensity: 0.45,
         roughness: 0.25
       }),
-      bushDark: new THREE.MeshStandardMaterial({ color: 0x276749, roughness: 0.75, flatShading: false }),
-      bushBright: new THREE.MeshStandardMaterial({ color: 0x38a169, roughness: 0.75, flatShading: false }),
+      bushDark: new THREE.MeshStandardMaterial({ color: 0x22543d, roughness: 0.75, flatShading: true }),
+      bushBright: new THREE.MeshStandardMaterial({ color: 0x38a169, roughness: 0.70, flatShading: true }),
       straw: new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.85, flatShading: true }),
       strawTwine: new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 }),
       ironMetal: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.7 }),
@@ -685,11 +685,16 @@ export class World {
       houseZ - 1.2
     );
 
-    // Warm hanging porch lantern light
-    const lLight = new THREE.PointLight(0xfef08a, 0.9, 8);
-    lLight.position.set(houseX, terraceElevation + 2.4, houseZ + 6.0);
+    // Warm hanging porch lantern light & ambient veranda fill
+    const lLight = new THREE.PointLight(0xfef08a, 1.6, 10);
+    lLight.position.set(houseX, terraceElevation + 2.4, houseZ + 5.95);
     this.lanternLight = lLight;
     this.scene.add(lLight);
+
+    // Soft warm fill light for porch entrance, timber rails & doorway
+    const porchFill = new THREE.PointLight(0xffedd5, 1.3, 8);
+    porchFill.position.set(houseX, terraceElevation + 1.4, houseZ + 4.8);
+    this.scene.add(porchFill);
 
     // Immediate interactive front door proxy so interactables array is immediately ready
     const doorProxyMesh = new THREE.Mesh(
@@ -699,17 +704,17 @@ export class World {
     doorProxyMesh.position.set(houseX, terraceElevation + 1.2, houseZ + 3.8);
     this.scene.add(doorProxyMesh);
 
+    this.isFarmhouseDoorOpen = false;
+
     const doorInteractable = {
       id: 'house_front_door',
       mesh: doorProxyMesh,
       name: 'Alpine Farmhouse Front Door',
-      prompt: 'Enter Farmhouse',
+      prompt: 'Open Door & Enter Farmhouse',
       ready: true,
       interact: (player) => {
-        if (this.farmhouseDoorLeaf) {
-          this.farmhouseDoorLeaf.rotation.y = Math.PI / 2;
-        }
         sounds.playInteract();
+        this.isFarmhouseDoorOpen = true;
         const fade = document.getElementById('screen-fade');
         if (fade) {
           fade.classList.add('active');
@@ -717,11 +722,15 @@ export class World {
             player.respawn(new THREE.Vector3(160, 1.2, 161.5));
             player.yaw = 0.0;
             player.pitch = 0.0;
-            setTimeout(() => { fade.classList.remove('active'); }, 250);
-          }, 300);
+            setTimeout(() => {
+              fade.classList.remove('active');
+              this.isFarmhouseDoorOpen = false;
+            }, 300);
+          }, 350);
         } else {
           player.respawn(new THREE.Vector3(160, 1.2, 161.5));
           player.yaw = 0.0;
+          this.isFarmhouseDoorOpen = false;
         }
         window.dispatchEvent(new CustomEvent('game:message', { detail: { message: '🏡 Entered cozy Alpine Farmhouse' } }));
       }
@@ -765,7 +774,14 @@ export class World {
         this.world.colliders.push({ box: col.box, mesh: col.mesh, type: 'solid' });
       });
 
-      // Bind door leaf
+      // Register smooth stair ramp collider (seamless ascent/descent from ground Y=0.60 to porch deck Y=1.50)
+      this.world.addRamp(-1.1, 1.1, -27.9, -26.2, 1.50, 0.60, 'z');
+
+      // Bind door hinge pivot & door leaf
+      const doorPivot = model.getObjectByName('door_pivot');
+      if (doorPivot) {
+        this.farmhouseDoorPivot = doorPivot;
+      }
       const doorLeaf = model.getObjectByName('door_leaf');
       if (doorLeaf) {
         this.farmhouseDoorLeaf = doorLeaf;
@@ -866,13 +882,13 @@ export class World {
         if (fade) {
           fade.classList.add('active');
           setTimeout(() => {
-            player.respawn(new THREE.Vector3(0, 1.2, -27.5));
+            player.respawn(new THREE.Vector3(0, 1.55, -28.2));
             player.yaw = 0.0;
             player.pitch = 0.0;
             setTimeout(() => { fade.classList.remove('active'); }, 250);
           }, 300);
         } else {
-          player.respawn(new THREE.Vector3(0, 1.2, -27.5));
+          player.respawn(new THREE.Vector3(0, 1.55, -28.2));
           player.yaw = 0.0;
         }
         window.dispatchEvent(new CustomEvent('game:message', { detail: { message: '☀️ Left Farmhouse, stepped onto veranda' } }));
@@ -2303,32 +2319,84 @@ export class World {
       this.scene.add(tuftGroup);
     });
 
-    // 2. Smooth Shrubbery & Garden Bushes (Lush, rounded organic shrub clusters)
-    const bushPositions = [
-      { x: -12.5, z: -21 }, { x: 12.5, z: -21 },
-      { x: -5.5, z: -21 }, { x: 5.5, z: -21 },
-      { x: -6, z: -5 }, { x: 6, z: -5 },
-      { x: -6, z: 8 }, { x: 6, z: 8 },
-      { x: 17, z: -3 }, { x: 29, z: -3 },
-      { x: -22, z: 2 }, { x: -22, z: 12 }
+    // 2. Stylized Organic Shrubbery & Garden Bushes (Faceted low-poly foliage clusters matching apple tree aesthetic)
+    const bushPlacements = [
+      // Terrace flanking bushes (framing the farmhouse garden and stone retaining wall)
+      { x: -7.5, z: -25.5, s: 1.15 },
+      { x: 7.5, z: -25.5, s: 1.10 },
+      { x: -11.5, z: -27.5, s: 1.25 },
+      { x: 11.5, z: -27.5, s: 1.20 },
+      { x: -9.0, z: -18.5, s: 1.05 },
+      { x: 9.0, z: -18.5, s: 1.05 },
+      // Path and field borders (framing country lane and crop beds)
+      { x: -6.5, z: -6.0, s: 0.95 },
+      { x: 6.5, z: -6.0, s: 0.95 },
+      { x: -6.5, z: 7.5, s: 1.00 },
+      { x: 6.5, z: 7.5, s: 1.00 },
+      // Orchard & meadow borders
+      { x: 16.5, z: -3.5, s: 1.10 },
+      { x: 28.5, z: -3.5, s: 1.05 },
+      { x: -21.5, z: 2.0, s: 1.15 },
+      { x: -21.5, z: 12.0, s: 1.10 }
     ];
 
-    bushPositions.forEach(bp => {
-      const bGroup = new THREE.Group();
-      bGroup.position.set(bp.x, 0, bp.z);
-
-      const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.85, 18, 14), bushMat);
-      b1.position.set(0, 0.65, 0);
-      b1.castShadow = true;
-      bGroup.add(b1);
-
-      const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.65, 18, 14), this.materials.leafLight);
-      b2.position.set(0.35, 0.78, 0.25);
-      b2.castShadow = true;
-      bGroup.add(b2);
-
-      this.scene.add(bGroup);
+    bushPlacements.forEach(bp => {
+      this.createStylizedBush(bp.x, bp.z, bp.s);
     });
+  }
+
+  createStylizedBush(x, z, scale = 1.0) {
+    const bGroup = new THREE.Group();
+    // Correct ground elevation: terrace knoll elevation is +0.60m for z <= -23 and |x| <= 14
+    const baseY = (z <= -23 && Math.abs(x) <= 14) ? 0.60 : 0.0;
+    bGroup.position.set(x, baseY, z);
+    bGroup.rotation.y = Math.random() * Math.PI * 2;
+
+    // Woody stem cluster grounded at base
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06 * scale, 0.09 * scale, 0.35 * scale, 5),
+      this.materials.trunk
+    );
+    stem.position.set(0, 0.17 * scale, 0);
+    stem.castShadow = true;
+    bGroup.add(stem);
+
+    // Multi-lobed faceted foliage clumps with organic variation
+    const clumps = [
+      { r: 0.72, pos: [0, 0.52, 0], mat: this.materials.bushDark },
+      { r: 0.58, pos: [0.22, 0.65, 0.18], mat: this.materials.bushBright },
+      { r: 0.52, pos: [-0.22, 0.60, -0.15], mat: this.materials.bushDark },
+      { r: 0.44, pos: [0.05, 0.82, -0.06], mat: this.materials.leafLight },
+      { r: 0.36, pos: [-0.16, 0.72, 0.20], mat: this.materials.bushBright },
+      { r: 0.30, pos: [0.26, 0.42, -0.20], mat: this.materials.bushDark }
+    ];
+
+    clumps.forEach((c, idx) => {
+      const geom = new THREE.DodecahedronGeometry(c.r * scale, 1);
+      const mesh = new THREE.Mesh(geom, c.mat);
+      mesh.position.set(c.pos[0] * scale, c.pos[1] * scale, c.pos[2] * scale);
+      mesh.rotation.set(idx * 0.4, idx * 0.7, idx * 0.2);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      bGroup.add(mesh);
+    });
+
+    // Decorative ruby berry accents
+    const berryGeom = new THREE.DodecahedronGeometry(0.05 * scale, 0);
+    const berryPositions = [
+      [0.26, 0.75, 0.26],
+      [-0.14, 0.82, 0.22],
+      [0.10, 0.90, -0.10],
+      [-0.28, 0.65, -0.16]
+    ];
+    berryPositions.forEach(bp => {
+      const berry = new THREE.Mesh(berryGeom, this.materials.apple);
+      berry.position.set(bp[0] * scale, bp[1] * scale, bp[2] * scale);
+      bGroup.add(berry);
+    });
+
+    this.scene.add(bGroup);
+    return bGroup;
   }
 
   update(dt, totalTime) {
@@ -2377,6 +2445,12 @@ export class World {
     // 5. Hearth firelight organic flicker
     if (this.isFireLit && this.hearthLight) {
       this.hearthLight.intensity = 2.6 + Math.sin(totalTime * 8) * 0.2 + Math.sin(totalTime * 17) * 0.12;
+    }
+
+    // 6. Farmhouse front door smooth hinge swing animation
+    if (this.farmhouseDoorPivot) {
+      const targetAngle = this.isFarmhouseDoorOpen ? -Math.PI / 2 : 0.0;
+      this.farmhouseDoorPivot.rotation.y += (targetAngle - this.farmhouseDoorPivot.rotation.y) * Math.min(1.0, 8.0 * dt);
     }
   }
 
