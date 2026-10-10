@@ -12,11 +12,11 @@ function createGrassTexture() {
   const ctx = canvas.getContext('2d');
 
   // Rich warm spring emerald base
-  ctx.fillStyle = '#449836';
+  ctx.fillStyle = '#4da738';
   ctx.fillRect(0, 0, 512, 512);
 
-  // Soft natural tonal variations (blended meadow greens)
-  const tones = ['#3d8c30', '#4da43c', '#56b044', '#38802b', '#489e3a', '#429334'];
+  // Soft natural tonal variations (warm meadow greens)
+  const tones = ['#429b30', '#56b840', '#60c448', '#3b8c2a', '#50ad36', '#48a232'];
   for (let i = 0; i < 4500; i++) {
     const x = Math.random() * 512;
     const y = Math.random() * 512;
@@ -446,22 +446,22 @@ export class World {
     this.scene.add(westLane);
 
     // Naturally embedded rustic flagstone edging along the main lane
-    const cobbleMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.95, flatShading: true });
-    for (let z = -20; z <= 30; z += 3.2) {
+    const cobbleMat = new THREE.MeshStandardMaterial({ color: 0x857d77, roughness: 0.92, flatShading: true });
+    for (let z = -20; z <= 30; z += 1.8) {
       const stoneL = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.28 + Math.sin(z) * 0.08, 0.36 + Math.cos(z) * 0.08, 0.04, 6),
+        new THREE.CylinderGeometry(0.32 + Math.sin(z) * 0.08, 0.42 + Math.cos(z) * 0.08, 0.05, 6),
         cobbleMat
       );
-      stoneL.position.set(-2.4 + Math.sin(z * 0.4) * 0.18, 0.022, z);
+      stoneL.position.set(-2.3 + Math.sin(z * 0.6) * 0.22, 0.025, z);
       stoneL.rotation.y = Math.sin(z) * Math.PI;
       stoneL.receiveShadow = true;
       this.scene.add(stoneL);
 
       const stoneR = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.28 + Math.cos(z) * 0.08, 0.36 + Math.sin(z) * 0.08, 0.04, 6),
+        new THREE.CylinderGeometry(0.32 + Math.cos(z) * 0.08, 0.42 + Math.sin(z) * 0.08, 0.05, 6),
         cobbleMat
       );
-      stoneR.position.set(2.4 + Math.cos(z * 0.4) * 0.18, 0.022, z);
+      stoneR.position.set(2.3 + Math.cos(z * 0.6) * 0.22, 0.025, z);
       stoneR.rotation.y = Math.cos(z) * Math.PI;
       stoneR.receiveShadow = true;
       this.scene.add(stoneR);
@@ -1164,22 +1164,33 @@ export class World {
         group.position.set(x, 0.22, z);
 
         const bodyGroup = new THREE.Group();
-        const mainSphere = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 1), pumpkinMat);
-        mainSphere.scale.set(1.25, 0.88, 1.25);
-        mainSphere.position.set(0, 0.34, 0);
+        // Segmented organic pumpkin with ribbed appearance
+        const mainSphere = new THREE.Mesh(new THREE.SphereGeometry(0.44, 16, 12), pumpkinMat);
+        mainSphere.scale.set(1.18, 0.76, 1.18);
+        mainSphere.position.set(0, 0.32, 0);
         mainSphere.castShadow = true;
         bodyGroup.add(mainSphere);
 
-        for (let pl = 0; pl < 3; pl++) {
-          const pLeaf = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.08, 6), leafMat);
-          pLeaf.rotation.x = -Math.PI / 2;
-          pLeaf.rotation.z = pl * (Math.PI * 2 / 3);
-          pLeaf.position.set(Math.cos(pl * 2) * 0.45, 0.1, Math.sin(pl * 2) * 0.45);
+        // Fluted ribbed side lobes
+        for (let lobe = 0; lobe < 6; lobe++) {
+          const lMesh = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), pumpkinMat);
+          const lang = (lobe / 6) * Math.PI * 2;
+          lMesh.scale.set(0.65, 1.05, 0.65);
+          lMesh.position.set(Math.cos(lang) * 0.34, 0.32, Math.sin(lang) * 0.34);
+          bodyGroup.add(lMesh);
+        }
+
+        // Vine leaves sprawled along soil
+        for (let pl = 0; pl < 4; pl++) {
+          const pLeaf = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 6), leafMat);
+          const lang = (pl / 4) * Math.PI * 2;
+          pLeaf.position.set(Math.cos(lang) * 0.46, 0.04, Math.sin(lang) * 0.46);
+          pLeaf.rotation.y = lang;
           bodyGroup.add(pLeaf);
         }
 
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.065, 0.22, 6), stemMat);
-        stem.position.set(0, 0.74, 0);
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.22, 6), stemMat);
+        stem.position.set(0.03, 0.66, 0);
         stem.rotation.z = 0.25;
         bodyGroup.add(stem);
 
