@@ -61,6 +61,8 @@ player.respawn(new THREE.Vector3(0, 1.2, 0));
 // Expose globals for inspection, testing, and debugging
 window.player = player;
 window.world = world;
+window.renderer = renderer;
+window.camera = camera;
 window.timeManager = timeManager;
 window.dayNightCycle = dayNightCycle;
 window.farmingManager = farmingManager;
@@ -495,12 +497,14 @@ const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.has('started')) {
   isGameStarted = true;
   startOverlay.classList.add('hidden');
+  startOverlay.style.display = 'none';
 }
 if (urlParams.has('continue')) {
   const loaded = saveManager.load();
   if (loaded) applySaveData(loaded);
   isGameStarted = true;
   startOverlay.classList.add('hidden');
+  startOverlay.style.display = 'none';
 }
 if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(-10, 1.2, -4));
@@ -510,6 +514,22 @@ if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(15, 1.2, -4));
   player.yaw = -0.85;
   player.pitch = -0.05;
+} else if (urlParams.get('cam') === 'blender-tree') {
+  player.respawn(new THREE.Vector3(15.8, 1.35, -2.8));
+  player.yaw = -0.85;
+  player.pitch = 0.16;
+} else if (urlParams.get('cam') === 'blender-trunk') {
+  player.respawn(new THREE.Vector3(18.6, 1.30, -4.8));
+  player.yaw = -0.86;
+  player.pitch = 0.38;
+} else if (urlParams.get('cam') === 'blender-apples') {
+  player.respawn(new THREE.Vector3(19.6, 1.30, -5.3));
+  player.yaw = -0.72;
+  player.pitch = 0.44;
+} else if (urlParams.get('cam') === 'blender-compare') {
+  player.respawn(new THREE.Vector3(14.0, 1.30, -3.8));
+  player.yaw = -0.92;
+  player.pitch = 0.10;
 }
 
 const timeParam = urlParams.get('time');

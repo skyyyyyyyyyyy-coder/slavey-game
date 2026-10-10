@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { sounds } from './audio.js';
 import { events } from './events.js';
 
@@ -1360,6 +1361,94 @@ export class World {
     ];
 
     orchardLocations.forEach((loc, tIndex) => {
+      // PROOF OF CONCEPT: Tree index 3 (at x=20.2, z=-6.2) uses the Blender-modeled apple tree
+      if (tIndex === 3) {
+        const treeGroup = new THREE.Group();
+        treeGroup.position.set(loc.x, 0, loc.z);
+        treeGroup.rotation.y = loc.rot || 0;
+        this.scene.add(treeGroup);
+
+        const trunkH = loc.h || 3.5;
+        const trunkRadius = 0.44;
+        this.world.addCylinderCollider(loc.x, loc.z, trunkRadius, trunkH);
+        const trunkBox = new THREE.Box3(
+          new THREE.Vector3(loc.x - trunkRadius, 0, loc.z - trunkRadius),
+          new THREE.Vector3(loc.x + trunkRadius, trunkH, loc.z + trunkRadius)
+        );
+        this.world.colliders.push({ box: trunkBox, mesh: treeGroup, type: 'solid', isCylinder: true });
+
+        const fruits = [];
+        for (let fIndex = 0; fIndex < 4; fIndex++) {
+          const fruitObj = {
+            id: `apple_tree_${tIndex}_fruit_${fIndex}`,
+            mesh: null,
+            name: `Apple Tree #${tIndex + 1} (Blender Model)`,
+            prompt: 'Pick Apple',
+            ready: true,
+            growTimer: 0,
+            regrowTime: 15.0,
+            baseY: 2.0,
+            interact: (player) => {
+              if (!fruitObj.ready) return;
+              fruitObj.ready = false;
+              fruitObj.growTimer = fruitObj.regrowTime;
+              if (fruitObj.mesh) fruitObj.mesh.scale.set(0.05, 0.05, 0.05);
+
+              player.addToBackpack('apple', 1);
+              sounds.playInteract();
+
+              events.emit('crop:harvested', { type: 'apple', id: fruitObj.id });
+
+              const evt = new CustomEvent('game:message', {
+                detail: { message: '🍎 Picked 1 Crisp Orchard Apple!' }
+              });
+              window.dispatchEvent(evt);
+            },
+            update: (dt) => {
+              if (!fruitObj.ready) {
+                fruitObj.growTimer -= dt;
+                const progress = 1 - (fruitObj.growTimer / fruitObj.regrowTime);
+                const scale = Math.min(1.0, 0.05 + progress * 0.95);
+                if (fruitObj.mesh) fruitObj.mesh.scale.set(scale, scale, scale);
+
+                if (fruitObj.growTimer <= 0) {
+                  fruitObj.ready = true;
+                  if (fruitObj.mesh) fruitObj.mesh.scale.set(1, 1, 1);
+                }
+              }
+            }
+          };
+          fruits.push(fruitObj);
+          this.interactables.push(fruitObj);
+        }
+
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load('/models/apple_tree.glb', (gltf) => {
+          const blenderModel = gltf.scene;
+          blenderModel.traverse(child => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          treeGroup.add(blenderModel);
+
+          // Connect apple fruit meshes so scaling and raycasting interact correctly
+          for (let fIndex = 0; fIndex < 4; fIndex++) {
+            const appleMeshNode = blenderModel.getObjectByName(`Apple_${fIndex}`);
+            if (appleMeshNode) {
+              fruits[fIndex].mesh = appleMeshNode;
+              if (!fruits[fIndex].ready) {
+                appleMeshNode.scale.set(0.05, 0.05, 0.05);
+              }
+            }
+          }
+        });
+
+        this.fruitTrees.push({ group: treeGroup, canopy: null, fruits, phaseOffset: loc.x * 0.5 + loc.z * 0.5 });
+        return;
+      }
+
       const treeGroup = new THREE.Group();
       treeGroup.position.set(loc.x, 0, loc.z);
       treeGroup.rotation.y = loc.rot || 0;
