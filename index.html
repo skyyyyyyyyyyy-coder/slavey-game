@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meadow Valley Simulator 🌾</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <!-- SIMULATOR HUD INTERFACE -->
+  <div id="hud">
+    <!-- Center Reticle & Interaction Prompt -->
+    <div id="center-ui">
+      <div id="reticle"></div>
+      <div id="interact-prompt" class="hidden">
+        <span class="key-badge">E</span>
+        <span id="interact-text">Harvest</span>
+      </div>
+    </div>
+
+    <!-- Top Bar -->
+    <div class="hud-top">
+      <div class="hud-panel">
+        <div class="sim-title">🌾 Meadow Valley Simulator</div>
+        <div class="sim-subtitle">Cozy Alpine Valley &bull; Sunny Farm Countryside</div>
+      </div>
+
+      <!-- IN-GAME CLOCK & CALENDAR PANEL -->
+      <div class="time-calendar-panel hud-panel" id="time-panel">
+        <div class="time-row">
+          <span class="time-phase-icon" id="time-icon">☀️</span>
+          <span class="time-clock" id="time-clock">08:00 AM</span>
+        </div>
+        <div class="calendar-row" id="time-date">Spring 1, Yr 1</div>
+      </div>
+
+      <div class="controls-hint hud-panel">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk &bull; <kbd>SHIFT</kbd> Jog</div>
+        <div><kbd>SPACE</kbd> Jump &bull; <kbd>C</kbd> Crouch</div>
+        <div><kbd>E</kbd> Pick Fruits & Harvest Crops</div>
+        <div><kbd>B</kbd> / <kbd>TAB</kbd> Backpack &bull; <kbd>ESC</kbd> Settings</div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container"></div>
+
+    <!-- Bottom Bar -->
+    <div class="hud-bottom">
+      <div class="player-stamina hud-panel">
+        <div class="meter-label">
+          <span>Stamina</span>
+          <span id="stamina-text">100%</span>
+        </div>
+        <div class="meter-bar">
+          <div class="meter-fill" id="stamina-fill" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <!-- Quick Backpack Hotbar -->
+      <div class="backpack-hotbar" id="hotbar-backpack" title="Press B or Tab to open full Backpack">
+        <div class="hotbar-title">🎒 Backpack:</div>
+        <div class="item-slot" id="slot-apple">
+          <span>🍎</span>
+          <span class="item-count" id="count-apple">0</span>
+        </div>
+        <div class="item-slot" id="slot-carrot">
+          <span>🥕</span>
+          <span class="item-count" id="count-carrot">0</span>
+        </div>
+        <div class="item-slot" id="slot-pumpkin">
+          <span>🎃</span>
+          <span class="item-count" id="count-pumpkin">0</span>
+        </div>
+        <div class="item-slot" id="slot-wheat">
+          <span>🌾</span>
+          <span class="item-count" id="count-wheat">0</span>
+        </div>
+      </div>
+
+      <div class="status-panel hud-panel">
+        <span class="status-badge" id="badge-ground">GROUNDED</span>
+        <span class="status-badge" id="badge-move">WALKING</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL BACKPACK INVENTORY MODAL -->
+  <div id="backpack-modal" class="hidden">
+    <div class="backpack-dialog">
+      <h2>🎒 Farm Backpack</h2>
+      <p style="color: #94a3b8; font-size: 13px;">Items harvested from the farm fields and fruit orchard.</p>
+      
+      <div class="backpack-grid">
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🍎</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Fresh Apple</div>
+            <div class="backpack-card-desc">Sweet fruit picked from orchard trees.</div>
+            <div class="backpack-card-count" id="modal-apple-count">Count: 0</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🥕</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Farm Carrot</div>
+            <div class="backpack-card-desc">Crisp root vegetable from the carrot patch.</div>
+            <div class="backpack-card-count" id="modal-carrot-count">Count: 0</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🎃</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Country Pumpkin</div>
+            <div class="backpack-card-desc">Heavy golden pumpkin from the patch.</div>
+            <div class="backpack-card-count" id="modal-pumpkin-count">Count: 0</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🌾</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Golden Wheat</div>
+            <div class="backpack-card-desc">Sun-ripened wheat bundle.</div>
+            <div class="backpack-card-count" id="modal-wheat-count">Count: 0</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-close-backpack" class="btn-primary" style="margin-top: 10px;">CLOSE BACKPACK (B / TAB)</button>
+    </div>
+  </div>
+
+  <!-- START OVERLAY -->
+  <div id="start-overlay" class="screen-overlay">
+    <div class="dialog-box">
+      <h1><span>🌾 MEADOW VALLEY</span> SIMULATOR</h1>
+      <p>
+        Explore a peaceful plain countryside surrounded by towering mountain ranges. 
+        Harvest carrots, pumpkins, and wheat from the farms, and pick fresh apples from the fruit trees 
+        into your backpack.
+      </p>
+
+      <div class="key-grid">
+        <div class="key-item">
+          <span>Walk</span>
+          <span><kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Look</span>
+          <span><kbd>Mouse</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Jump</span>
+          <span><kbd>Space</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Jog / Run</span>
+          <span><kbd>Shift</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Crouch</span>
+          <span><kbd>C</kbd> / <kbd>Ctrl</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Harvest / Pick</span>
+          <span><kbd>E</kbd> / <kbd>Left Click</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Open Backpack</span>
+          <span><kbd>B</kbd> / <kbd>Tab</kbd></span>
+        </div>
+        <div class="key-item">
+          <span>Settings</span>
+          <span><kbd>ESC</kbd></span>
+        </div>
+      </div>
+
+      <div class="start-menu-actions">
+        <button id="btn-continue" class="btn-primary btn-continue hidden">CONTINUE FARM</button>
+        <button id="btn-new-game" class="btn-primary">NEW FARM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAUSE / SETTINGS OVERLAY -->
+  <div id="pause-overlay" class="screen-overlay hidden">
+    <div class="dialog-box">
+      <h1><span>SIMULATION</span> PAUSED</h1>
+      
+      <div class="settings-group">
+        <div class="setting-row">
+          <label for="slider-sens">Look Sensitivity: <span id="sens-val">1.0x</span></label>
+          <input type="range" id="slider-sens" min="0.2" max="3.0" step="0.1" value="1.0" />
+        </div>
+
+        <div class="setting-row">
+          <label for="slider-vol">Ambient Volume: <span id="vol-val">50%</span></label>
+          <input type="range" id="slider-vol" min="0" max="1.0" step="0.05" value="0.5" />
+        </div>
+
+        <div class="setting-row">
+          <label for="toggle-bob">Head Bobbing Effect</label>
+          <input type="checkbox" id="toggle-bob" checked />
+        </div>
+
+        <div class="setting-row">
+          <label for="toggle-invert">Invert Y Axis</label>
+          <input type="checkbox" id="toggle-invert" />
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 12px;">
+        <div style="display: flex; gap: 12px;">
+          <button id="btn-resume" class="btn-primary" style="flex: 1;">RESUME</button>
+          <button id="btn-save" class="btn-secondary" style="flex: 1;">💾 SAVE GAME</button>
+        </div>
+        <button id="btn-respawn" class="btn-secondary">RESET POSITION</button>
+        <div class="save-indicator" id="pause-save-status">Auto-save active</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM NEW FARM MODAL -->
+  <div id="confirm-modal" class="screen-overlay hidden" style="z-index: 100;">
+    <div class="dialog-box" style="max-width: 440px;">
+      <h1><span>⚠️ START NEW</span> FARM?</h1>
+      <p style="color: #cbd5e1; font-size: 14px; margin: 14px 0;">
+        You already have a saved farm. Starting a New Farm will overwrite your existing progress and save data.
+      </p>
+      <div style="display: flex; gap: 12px; margin-top: 14px;">
+        <button id="btn-confirm-cancel" class="btn-secondary" style="flex: 1;">CANCEL</button>
+        <button id="btn-confirm-overwrite" class="btn-primary btn-danger" style="flex: 1;">OVERWRITE & START</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
