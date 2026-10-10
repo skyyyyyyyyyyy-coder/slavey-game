@@ -306,7 +306,28 @@ export class FarmingManager {
       }
     }
 
-    // 7. Already occupied by a tilled tile
+    // 7. Strictly enforce designated Arable Farming Zones in Meadow Valley
+    // (Restricts tilling on mountains, paths, knolls, forests, and wild meadows)
+    const inArableZone = (
+      // Zone 1: West Homestead Arable Field (Kitchen Garden & Tutorial field)
+      (gx >= -10 && gx <= -4 && gz >= -2 && gz <= 10) ||
+      // Zone 2: South-West Farm Field Paddock
+      (gx >= -22 && gx <= -10 && gz >= 11 && gz <= 21) ||
+      // Zone 3: North-West Farm Field Paddock
+      (gx >= -22 && gx <= -10 && gz >= -19 && gz <= -9) ||
+      // Zone 4: South-East Farm Field Paddock
+      (gx >= 10 && gx <= 22 && gz >= 11 && gz <= 21) ||
+      // Zone 5: North-East Farm Field Paddock
+      (gx >= 10 && gx <= 22 && gz >= -19 && gz <= -9) ||
+      // Zone 6: East Homestead Arable Field
+      (gx >= 4 && gx <= 10 && gz >= -2 && gz <= 10)
+    );
+
+    if (!inArableZone) {
+      return { valid: false, reason: 'Unsuitable soil — Only marked arable fields can be tilled' };
+    }
+
+    // 8. Already occupied by a tilled tile
     const key = `${gx}_${gz}`;
     if (this.tiles.has(key)) {
       return { valid: false, reason: 'Tile is already tilled' };
@@ -468,6 +489,37 @@ export class FarmingManager {
   }
 
   /**
+   * Helper to construct a clean, aligned 1x1m raised soil bed with seamless longitudinal furrows
+   */
+  createSoilBedMesh(isWatered = false) {
+    const soilGroup = new THREE.Group();
+
+    // Clean flat 1.0x1.0m raised soil bed slab (elevation 0.035m, perfectly aligned)
+    const soilMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.0, 0.035, 1.0),
+      isWatered ? this.materials.wateredSoil : this.materials.drySoil
+    );
+    soilMesh.position.set(0, 0.0175, 0);
+    soilMesh.receiveShadow = true;
+    soilGroup.add(soilMesh);
+
+    // Subtle aligned longitudinal furrow ridges running along Z (connecting seamlessly between adjacent tiles)
+    const furrowGeo = new THREE.BoxGeometry(0.18, 0.012, 1.0);
+    const furrowMat = isWatered ? this.materials.wateredSoil : this.materials.soilFurrow;
+    const furrowL = new THREE.Mesh(furrowGeo, furrowMat);
+    furrowL.position.set(-0.26, 0.038, 0);
+    furrowL.receiveShadow = true;
+    soilGroup.add(furrowL);
+
+    const furrowR = new THREE.Mesh(furrowGeo, furrowMat);
+    furrowR.position.set(0.26, 0.038, 0);
+    furrowR.receiveShadow = true;
+    soilGroup.add(furrowR);
+
+    return { soilGroup, soilMesh, furrows: [furrowL, furrowR] };
+  }
+
+  /**
    * Till grass into farmland
    */
   tillTile(gx, gz, player) {
@@ -477,21 +529,9 @@ export class FarmingManager {
     // Drain stamina
     player.stamina = Math.max(0, player.stamina - 8);
 
-    // Create 1x1m soil mesh
-    const soilGroup = new THREE.Group();
-    soilGroup.position.set(gx, 0.02, gz);
-
-    const soilMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), this.materials.drySoil);
-    soilMesh.rotateX(-Math.PI / 2);
-    soilMesh.receiveShadow = true;
-    soilGroup.add(soilMesh);
-
-    // Subtle 3D ridge furrow along soil
-    const furrow = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.92, 8), this.materials.soilFurrow);
-    furrow.rotateZ(Math.PI / 2);
-    furrow.position.set(0, 0.04, 0);
-    furrow.receiveShadow = true;
-    soilGroup.add(furrow);
+    // Create clean 1x1m soil bed mesh aligned to grid
+    const { soilGroup, soilMesh, furrows } = this.createSoilBedMesh(false);
+    soilGroup.position.set(gx, 0.0, gz);
 
     this.farmingGroup.add(soilGroup);
 
@@ -504,6 +544,7 @@ export class FarmingManager {
       crop: null,
       soilGroup,
       soilMesh,
+      furrows,
       cropGroup: null
     };
 
@@ -537,6 +578,9 @@ export class FarmingManager {
 
     tile.isWatered = true;
     tile.soilMesh.material = this.materials.wateredSoil;
+    if (tile.furrows) {
+      tile.furrows.forEach(f => f.material = this.materials.wateredSoil);
+    }
 
     sounds.playInteract();
     if (this.particles) {
@@ -713,6 +757,9 @@ export class FarmingManager {
         // Daily moisture reset boundary: soil dries out
         tile.isWatered = false;
         tile.soilMesh.material = this.materials.drySoil;
+        if (tile.furrows) {
+          tile.furrows.forEach(f => f.material = this.materials.soilFurrow);
+        }
       }
     });
 
@@ -809,7 +856,7 @@ export class FarmingManager {
           group.add(stalk);
         }
       } else if (stage === 4) {
-        // Stage 4: Heavy golden grain sheaf
+        // Stage 4: Heavy golden grain sheaf with bearded awns
         for (let i = 0; i < 10; i++) {
           const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.72, 6), mats.wheatRipe);
           stalk.position.set((i % 3 - 1) * 0.15, 0.36, (Math.floor(i / 3) - 1) * 0.15);
@@ -820,6 +867,12 @@ export class FarmingManager {
           const head = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.03, 0.22, 6), mats.wheatRipe);
           head.position.set(stalk.position.x, 0.76, stalk.position.z);
           group.add(head);
+
+          // Bearded awn whiskers
+          const awn = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.12, 4), mats.wheatRipe);
+          awn.position.set(stalk.position.x, 0.90, stalk.position.z);
+          awn.rotation.z = (Math.random() - 0.5) * 0.25;
+          group.add(awn);
         }
       }
     } else if (type === 'pumpkin') {
@@ -852,22 +905,32 @@ export class FarmingManager {
           group.add(leaf);
         }
       } else if (stage === 4) {
-        // Stage 4: Large ripe country pumpkin with ribbed shape & green stem
-        const pumpkin = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 12), mats.pumpkinOrange);
-        pumpkin.scale.set(1.25, 0.9, 1.25);
-        pumpkin.position.set(0, 0.28, 0);
-        pumpkin.castShadow = true;
-        group.add(pumpkin);
+        // Stage 4: Large ripe country pumpkin with fluted ribs & curved green stem
+        const pumpkinCenter = new THREE.Mesh(new THREE.SphereGeometry(0.30, 14, 12), mats.pumpkinOrange);
+        pumpkinCenter.scale.set(1.2, 0.9, 1.2);
+        pumpkinCenter.position.set(0, 0.26, 0);
+        pumpkinCenter.castShadow = true;
+        group.add(pumpkinCenter);
 
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.15, 6), mats.pumpkinStem);
-        stem.position.set(0, 0.58, 0);
-        stem.rotation.z = 0.2;
+        // 6 fluted ribbed lobes around circumference
+        for (let lobe = 0; lobe < 6; lobe++) {
+          const lMesh = new THREE.Mesh(new THREE.SphereGeometry(0.20, 10, 8), mats.pumpkinOrange);
+          const lang = (lobe / 6) * Math.PI * 2;
+          lMesh.scale.set(0.65, 1.02, 0.65);
+          lMesh.position.set(Math.cos(lang) * 0.26, 0.26, Math.sin(lang) * 0.26);
+          lMesh.castShadow = true;
+          group.add(lMesh);
+        }
+
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.18, 6), mats.pumpkinStem);
+        stem.position.set(0.02, 0.54, 0);
+        stem.rotation.z = 0.25;
         group.add(stem);
 
         for (let l = 0; l < 5; l++) {
           const leaf = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 6), mats.leafLush);
           const rot = (l / 5) * Math.PI * 2;
-          leaf.position.set(Math.cos(rot) * 0.36, 0.12, Math.sin(rot) * 0.36);
+          leaf.position.set(Math.cos(rot) * 0.38, 0.10, Math.sin(rot) * 0.38);
           group.add(leaf);
         }
       }
@@ -921,7 +984,7 @@ export class FarmingManager {
           group.add(clump);
         }
 
-        // 4 Plump Ripe Red Tomatoes
+        // 4 Plump Ripe Red Tomatoes with green calyx caps
         const tomCoords = [
           { x: -0.16, y: 0.42, z: 0.2 },
           { x: 0.15, y: 0.48, z: 0.2 },
@@ -934,6 +997,10 @@ export class FarmingManager {
           tom.position.set(tc.x, tc.y, tc.z);
           tom.castShadow = true;
           group.add(tom);
+
+          const calyx = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.04, 5), mats.leafGreen);
+          calyx.position.set(tc.x, tc.y + 0.08, tc.z);
+          group.add(calyx);
         });
       }
     }
@@ -1032,22 +1099,9 @@ export class FarmingManager {
         const { gx, gz, isWatered, crop } = savedTile;
         const key = `${gx}_${gz}`;
 
-        const soilGroup = new THREE.Group();
-        soilGroup.position.set(gx, 0.02, gz);
-
-        const soilMesh = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.96, 0.96),
-          isWatered ? this.materials.wateredSoil : this.materials.drySoil
-        );
-        soilMesh.rotateX(-Math.PI / 2);
-        soilMesh.receiveShadow = true;
-        soilGroup.add(soilMesh);
-
-        const furrow = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.92, 8), this.materials.soilFurrow);
-        furrow.rotateZ(Math.PI / 2);
-        furrow.position.set(0, 0.04, 0);
-        furrow.receiveShadow = true;
-        soilGroup.add(furrow);
+        // Create clean 1x1m soil bed mesh aligned to grid
+        const { soilGroup, soilMesh, furrows } = this.createSoilBedMesh(!!isWatered);
+        soilGroup.position.set(gx, 0.0, gz);
 
         this.farmingGroup.add(soilGroup);
 
@@ -1065,6 +1119,7 @@ export class FarmingManager {
           } : null,
           soilGroup,
           soilMesh,
+          furrows,
           cropGroup: null
         };
 

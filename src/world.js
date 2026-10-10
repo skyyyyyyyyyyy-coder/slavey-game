@@ -289,13 +289,16 @@ export class World {
       bushBright: new THREE.MeshStandardMaterial({ color: 0x38a169, roughness: 0.75, flatShading: false }),
       straw: new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.85, flatShading: true }),
       strawTwine: new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 }),
-      ironMetal: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.7 })
+      ironMetal: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.7 }),
+      poppy: new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6 }),
+      buttercup: new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.6 })
     };
 
     this.initSkyAndLighting();
     this.buildMeadowAndTerrace();
     this.buildLayeredMountainHorizon();
     this.buildAlpineFarmhouse();
+    this.buildFarmhouseInterior();
     this.buildCropFields();
     this.buildFacetedTrees();
     this.buildEnvironmentalStorytelling();
@@ -608,19 +611,60 @@ export class World {
       this.scene.add(hillMesh);
     }
 
-    // 4. VALLEY PERIMETER COLLIDERS (clean invisible barrier boundary at radius ~65m)
-    for (let b = 0; b < 16; b++) {
-      const angle = (b / 16) * Math.PI * 2;
-      const bx = Math.cos(angle) * 68;
-      const bz = Math.sin(angle) * 68;
-      const barrier = new THREE.Mesh(
-        new THREE.BoxGeometry(28, 25, 28),
-        new THREE.MeshBasicMaterial({ visible: false })
-      );
-      barrier.position.set(bx, 12.5, bz);
-      this.scene.add(barrier);
-      this.world.addBoxCollider(barrier);
-    }
+    // 4. IMPENETRABLE VALLEY PERIMETER BOUNDARY WALLS
+    // Prevents player from climbing mountains, glitching into rocks, or leaving playable valley floor
+    const barrierMat = new THREE.MeshBasicMaterial({ visible: false });
+
+    // North Mountain Barrier Wall (at z=-43, immediately behind farmhouse knoll & pine tree line)
+    const northWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 8), barrierMat);
+    northWall.position.set(0, 15, -43.0);
+    this.scene.add(northWall);
+    this.world.addBoxCollider(northWall);
+
+    // South Valley Meadow Barrier Wall (at z=49)
+    const southWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 8), barrierMat);
+    southWall.position.set(0, 15, 49.0);
+    this.scene.add(southWall);
+    this.world.addBoxCollider(southWall);
+
+    // West Ridge Barrier Wall (at x=-51, behind apple orchard)
+    const westWall = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 105), barrierMat);
+    westWall.position.set(-51.0, 15, 3.0);
+    this.scene.add(westWall);
+    this.world.addBoxCollider(westWall);
+
+    // East Foothill Barrier Wall (at x=51, behind east paddocks & picnic grove)
+    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 105), barrierMat);
+    eastWall.position.set(51.0, 15, 3.0);
+    this.scene.add(eastWall);
+    this.world.addBoxCollider(eastWall);
+
+    // 4 Diagonal Corner Wedges (sealing the perimeter completely)
+    const cornerGeo = new THREE.BoxGeometry(26, 30, 12);
+
+    const nwWedge = new THREE.Mesh(cornerGeo, barrierMat);
+    nwWedge.position.set(-42, 15, -36);
+    nwWedge.rotation.y = Math.PI / 4;
+    this.scene.add(nwWedge);
+    this.world.addBoxCollider(nwWedge);
+
+    const neWedge = new THREE.Mesh(cornerGeo, barrierMat);
+    neWedge.position.set(42, 15, -36);
+    neWedge.rotation.y = -Math.PI / 4;
+    this.scene.add(neWedge);
+    this.world.addBoxCollider(neWedge);
+
+    const swWedge = new THREE.Mesh(cornerGeo, barrierMat);
+    swWedge.position.set(-42, 15, 42);
+    swWedge.rotation.y = -Math.PI / 4;
+    this.scene.add(swWedge);
+    this.world.addBoxCollider(swWedge);
+
+    const seWedge = new THREE.Mesh(cornerGeo, barrierMat);
+    seWedge.position.set(42, 15, 42);
+    seWedge.rotation.y = Math.PI / 4;
+    this.scene.add(seWedge);
+    this.world.addBoxCollider(seWedge);
   }
 
   /**
@@ -834,7 +878,45 @@ export class World {
 
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.1), woodMat);
     door.position.set(0, 1.5, houseD / 2 + 0.1);
+    door.castShadow = true;
     houseGroup.add(door);
+
+    // Decorative iron hinges & ring handle
+    const hingeGeo = new THREE.BoxGeometry(0.18, 0.04, 0.02);
+    const h1 = new THREE.Mesh(hingeGeo, this.materials.ironMetal); h1.position.set(-0.48, 2.1, houseD / 2 + 0.16); houseGroup.add(h1);
+    const h2 = new THREE.Mesh(hingeGeo, this.materials.ironMetal); h2.position.set(-0.48, 0.9, houseD / 2 + 0.16); houseGroup.add(h2);
+
+    const ringHandle = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), this.materials.ironMetal);
+    ringHandle.position.set(0.42, 1.45, houseD / 2 + 0.17);
+    houseGroup.add(ringHandle);
+
+    // Register front door interactable: [E] Enter Farmhouse
+    this.interactables.push({
+      id: 'house_front_door',
+      mesh: door,
+      name: 'Alpine Farmhouse',
+      prompt: 'Enter Farmhouse',
+      ready: true,
+      interact: (player) => {
+        const fade = document.getElementById('screen-fade');
+        if (fade) {
+          fade.classList.add('active');
+          setTimeout(() => {
+            player.respawn(new THREE.Vector3(160, 1.2, 161.5));
+            player.yaw = 0.0; // facing inside towards hearth at z=155
+            player.pitch = 0.0;
+            setTimeout(() => {
+              fade.classList.remove('active');
+            }, 250);
+          }, 300);
+        } else {
+          player.respawn(new THREE.Vector3(160, 1.2, 161.5));
+          player.yaw = 0.0;
+        }
+        const evt = new CustomEvent('game:message', { detail: { message: '🏡 Entered cozy Alpine Farmhouse' } });
+        window.dispatchEvent(evt);
+      }
+    });
 
     [-1.2, 1.2].forEach(lx => {
       const lant = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), windowMat);
@@ -937,6 +1019,315 @@ export class World {
   }
 
   /**
+   * Cozy Alpine Farmhouse Interior Scene at (160, 0, 160)
+   * Completely isolated room with fireplace/hearth, quilted bed, dining table, chairs,
+   * kitchen shelving, storage trunk, braided rug, warm interior lighting, and exit door.
+   */
+  buildFarmhouseInterior() {
+    const intGroup = new THREE.Group();
+    const originX = 160;
+    const originZ = 160;
+    intGroup.position.set(originX, 0, originZ);
+
+    const woodMat = this.materials.wood;
+    const logMat = this.materials.timberLog;
+    const stoneMat = this.materials.stoneWall;
+    const stuccoMat = this.materials.whiteStucco;
+    const ironMat = this.materials.ironMetal;
+
+    const roomW = 10.0;
+    const roomD = 10.0;
+    const roomH = 3.8;
+
+    // 1. Cedar Floorboards
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.2, roomD), woodMat);
+    floor.position.set(0, -0.1, -1.0);
+    floor.receiveShadow = true;
+    intGroup.add(floor);
+
+    // 2. Ceiling & Heavy Timber Beams
+    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.2, roomD), woodMat);
+    ceiling.position.set(0, roomH, -1.0);
+    intGroup.add(ceiling);
+
+    for (let b = 0; b < 4; b++) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.32, 0.32), logMat);
+      beam.position.set(0, roomH - 0.16, -4.5 + b * 2.4);
+      beam.castShadow = true;
+      intGroup.add(beam);
+    }
+
+    // 3. Walls
+    // North Wall with fireplace opening
+    const wallN1 = new THREE.Mesh(new THREE.BoxGeometry(3.6, roomH, 0.3), stuccoMat);
+    wallN1.position.set(-3.2, roomH / 2, -6.0);
+    intGroup.add(wallN1);
+    const wallN2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, roomH, 0.3), stuccoMat);
+    wallN2.position.set(3.2, roomH / 2, -6.0);
+    intGroup.add(wallN2);
+
+    // South Wall (with doorway at center)
+    const wallS1 = new THREE.Mesh(new THREE.BoxGeometry(4.0, roomH, 0.3), stuccoMat);
+    wallS1.position.set(-3.0, roomH / 2, 4.0);
+    intGroup.add(wallS1);
+    const wallS2 = new THREE.Mesh(new THREE.BoxGeometry(4.0, roomH, 0.3), stuccoMat);
+    wallS2.position.set(3.0, roomH / 2, 4.0);
+    intGroup.add(wallS2);
+    const wallSHeader = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.2, 0.3), stuccoMat);
+    wallSHeader.position.set(0, roomH - 0.6, 4.0);
+    intGroup.add(wallSHeader);
+
+    // West Wall
+    const wallW = new THREE.Mesh(new THREE.BoxGeometry(0.3, roomH, roomD), stuccoMat);
+    wallW.position.set(-roomW / 2, roomH / 2, -1.0);
+    intGroup.add(wallW);
+
+    // East Wall
+    const wallE = new THREE.Mesh(new THREE.BoxGeometry(0.3, roomH, roomD), stuccoMat);
+    wallE.position.set(roomW / 2, roomH / 2, -1.0);
+    intGroup.add(wallE);
+
+    // Baseboards
+    const baseboardN = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.25, 0.1), logMat);
+    baseboardN.position.set(0, 0.12, -5.85);
+    intGroup.add(baseboardN);
+
+    // 4. Fireplace & Fieldstone Hearth
+    const hearthMantle = new THREE.Mesh(new THREE.BoxGeometry(3.0, 3.2, 0.8), stoneMat);
+    hearthMantle.position.set(0, 1.6, -5.7);
+    hearthMantle.castShadow = true;
+    intGroup.add(hearthMantle);
+
+    // Firebox opening cavity
+    const firebox = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 1.4, 0.7),
+      new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.95 })
+    );
+    firebox.position.set(0, 0.7, -5.5);
+    intGroup.add(firebox);
+
+    // Mantle shelf
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 0.45), logMat);
+    shelf.position.set(0, 2.9, -5.3);
+    shelf.castShadow = true;
+    intGroup.add(shelf);
+
+    // Clock on mantle
+    const clock = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.15), woodMat);
+    clock.position.set(0, 3.15, -5.3);
+    intGroup.add(clock);
+
+    // Burning Cedar Logs & Glowing Embers
+    const emberMat = new THREE.MeshStandardMaterial({
+      color: 0xf97316,
+      emissive: 0xea580c,
+      emissiveIntensity: 2.2,
+      roughness: 0.4
+    });
+    for (let l = 0; l < 3; l++) {
+      const emberLog = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.8, 8), emberMat);
+      emberLog.rotation.z = Math.PI / 2 + (l - 1) * 0.2;
+      emberLog.position.set((l - 1) * 0.22, 0.25 + l * 0.08, -5.45);
+      intGroup.add(emberLog);
+    }
+
+    // Warm Hearth Point Light
+    const hearthLight = new THREE.PointLight(0xff7a18, 2.8, 14, 1.5);
+    hearthLight.position.set(0, 1.1, -5.2);
+    hearthLight.castShadow = true;
+    intGroup.add(hearthLight);
+
+    // Hearth Rug in front of fireplace
+    const hearthRug = new THREE.Mesh(
+      new THREE.BoxGeometry(2.8, 0.02, 1.6),
+      new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 })
+    );
+    hearthRug.position.set(0, 0.01, -4.2);
+    intGroup.add(hearthRug);
+
+    // 5. Cozy Quilted Bed in North-West Corner
+    const bedX = -3.2;
+    const bedZ = -4.2;
+    const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 2.8), woodMat);
+    bedFrame.position.set(bedX, 0.28, bedZ);
+    bedFrame.castShadow = true;
+    intGroup.add(bedFrame);
+
+    const headboard = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 0.16), logMat);
+    headboard.position.set(bedX, 0.9, bedZ - 1.35);
+    headboard.castShadow = true;
+    intGroup.add(headboard);
+
+    // Mattress & Quilted Blanket
+    const mattress = new THREE.Mesh(
+      new THREE.BoxGeometry(1.9, 0.35, 2.5),
+      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.85 })
+    );
+    mattress.position.set(bedX, 0.65, bedZ);
+    intGroup.add(mattress);
+
+    const quilt = new THREE.Mesh(
+      new THREE.BoxGeometry(1.95, 0.28, 1.8),
+      new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.9 })
+    );
+    quilt.position.set(bedX, 0.72, bedZ + 0.35);
+    quilt.castShadow = true;
+    intGroup.add(quilt);
+
+    const pillow = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.22, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.85 })
+    );
+    pillow.position.set(bedX, 0.8, bedZ - 0.95);
+    pillow.rotation.x = 0.15;
+    intGroup.add(pillow);
+
+    // 6. Bedside Nightstand & Candle
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.65, 0.8), woodMat);
+    stand.position.set(bedX + 1.6, 0.32, bedZ - 1.0);
+    stand.castShadow = true;
+    intGroup.add(stand);
+
+    const candle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.04, 0.18, 8),
+      new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfacc15, emissiveIntensity: 0.8 })
+    );
+    candle.position.set(bedX + 1.6, 0.74, bedZ - 1.0);
+    intGroup.add(candle);
+
+    // 7. Storage Trunk / Chest near Bed
+    const trunk = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.65, 0.75), woodMat);
+    trunk.position.set(bedX, 0.32, bedZ + 1.8);
+    trunk.castShadow = true;
+    intGroup.add(trunk);
+
+    const trunkBand1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.67, 0.77), ironMat);
+    trunkBand1.position.set(bedX - 0.45, 0.32, bedZ + 1.8);
+    intGroup.add(trunkBand1);
+    const trunkBand2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.67, 0.77), ironMat);
+    trunkBand2.position.set(bedX + 0.45, 0.32, bedZ + 1.8);
+    intGroup.add(trunkBand2);
+
+    // 8. Wooden Dining Table & Chairs on East side
+    const tableX = 3.0;
+    const tableZ = -1.5;
+    const table = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 1.4), woodMat);
+    table.position.set(tableX, 0.425, tableZ);
+    table.castShadow = true;
+    intGroup.add(table);
+
+    // 2 Chairs
+    [-1.0, 1.0].forEach(cy => {
+      const chair = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.5, 0.65), woodMat);
+      chair.position.set(tableX + cy * 1.5, 0.25, tableZ);
+      chair.castShadow = true;
+      intGroup.add(chair);
+
+      const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 0.65), logMat);
+      backrest.position.set(tableX + cy * 1.8, 0.75, tableZ);
+      intGroup.add(backrest);
+    });
+
+    // Bread bowl & table lamp
+    const breadBowl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.16, 0.12, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 })
+    );
+    breadBowl.position.set(tableX - 0.3, 0.91, tableZ);
+    intGroup.add(breadBowl);
+
+    const tableLamp = new THREE.PointLight(0xfef08a, 1.3, 8, 1.2);
+    tableLamp.position.set(tableX, 1.6, tableZ);
+    intGroup.add(tableLamp);
+
+    // 9. Kitchen Shelves in South-East Corner
+    for (let s = 0; s < 3; s++) {
+      const kShelf = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 0.45), logMat);
+      kShelf.position.set(3.8, 1.4 + s * 0.65, 2.4);
+      intGroup.add(kShelf);
+
+      for (let j = 0; j < 3; j++) {
+        const jar = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.10, 0.12, 0.25, 8),
+          new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.7 })
+        );
+        jar.position.set(3.2 + j * 0.5, 1.56 + s * 0.65, 2.4);
+        intGroup.add(jar);
+      }
+    }
+
+    // 10. Large Center Braided Rug
+    const centerRug = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.9, 1.9, 0.02, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.92 })
+    );
+    centerRug.scale.set(1.25, 1.0, 0.9);
+    centerRug.position.set(0, 0.015, -1.0);
+    centerRug.receiveShadow = true;
+    intGroup.add(centerRug);
+
+    // 11. Exit Doorway & Interactive Exit Door
+    const exitDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.25), logMat);
+    exitDoorFrame.position.set(0, 1.3, 3.9);
+    intGroup.add(exitDoorFrame);
+
+    const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 0.12), woodMat);
+    exitDoor.position.set(0, 1.2, 3.85);
+    exitDoor.castShadow = true;
+    intGroup.add(exitDoor);
+
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), ironMat);
+    handle.position.set(0.42, 1.2, 3.78);
+    intGroup.add(handle);
+
+    this.scene.add(intGroup);
+
+    // Solid Floor, Wall & Furniture Colliders for Interior Room
+    const wallColliders = [
+      // Solid floor beneath cedar floorboards (Y=0)
+      new THREE.Box3(new THREE.Vector3(originX - 6.0, -2.0, originZ - 7.0), new THREE.Vector3(originX + 6.0, 0.0, originZ + 5.0)),
+      new THREE.Box3(new THREE.Vector3(originX - 5.2, 0, originZ - 6.4), new THREE.Vector3(originX + 5.2, roomH, originZ - 5.8)),
+      new THREE.Box3(new THREE.Vector3(originX - 5.2, 0, originZ + 3.9), new THREE.Vector3(originX + 5.2, roomH, originZ + 4.5)),
+      new THREE.Box3(new THREE.Vector3(originX - 5.4, 0, originZ - 6.4), new THREE.Vector3(originX - 4.8, roomH, originZ + 4.5)),
+      new THREE.Box3(new THREE.Vector3(originX + 4.8, 0, originZ - 6.4), new THREE.Vector3(originX + 5.4, roomH, originZ + 4.5)),
+      new THREE.Box3(new THREE.Vector3(originX + bedX - 1.2, 0, originZ + bedZ - 1.5), new THREE.Vector3(originX + bedX + 1.2, 1.4, originZ + bedZ + 1.5)),
+      new THREE.Box3(new THREE.Vector3(originX + tableX - 1.3, 0, originZ + tableZ - 0.8), new THREE.Vector3(originX + tableX + 1.3, 1.0, originZ + tableZ + 0.8))
+    ];
+
+    wallColliders.forEach(box => {
+      this.world.colliders.push({ box, mesh: floor, type: 'solid' });
+    });
+
+    // Interactable Exit Door: [E] Leave Farmhouse
+    this.interactables.push({
+      id: 'house_exit_door',
+      mesh: exitDoor,
+      name: 'Front Door',
+      prompt: 'Leave Farmhouse',
+      ready: true,
+      interact: (player) => {
+        const fade = document.getElementById('screen-fade');
+        if (fade) {
+          fade.classList.add('active');
+          setTimeout(() => {
+            player.respawn(new THREE.Vector3(0, 1.2, -27.5));
+            player.yaw = 0.0; // facing south out into the valley
+            player.pitch = 0.0;
+            setTimeout(() => {
+              fade.classList.remove('active');
+            }, 250);
+          }, 300);
+        } else {
+          player.respawn(new THREE.Vector3(0, 1.2, -27.5));
+          player.yaw = 0.0;
+        }
+        const evt = new CustomEvent('game:message', { detail: { message: '☀️ Left Farmhouse, stepped onto veranda' } });
+        window.dispatchEvent(evt);
+      }
+    });
+  }
+
+  /**
    * Enclosed agricultural crop paddocks with split-rail fences and plot signposts
    */
   buildCropFields() {
@@ -950,23 +1341,21 @@ export class World {
       const paddockGroup = new THREE.Group();
       paddockGroup.position.set(x, 0, z);
 
-      // Soil bed
-      const soilBed = new THREE.Mesh(new THREE.BoxGeometry(w, 0.16, d), soilMat);
-      soilBed.position.set(0, 0.08, 0);
+      // Clean leveled arable soil bed
+      const soilBed = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), soilMat);
+      soilBed.position.set(0, 0.025, 0);
       soilBed.receiveShadow = true;
       paddockGroup.add(soilBed);
 
-      // 4 distinct 3D furrow mounds
-      const furrowCount = 4;
-      const furrowSpacing = (d - 2.2) / (furrowCount - 1);
+      // Clean longitudinal furrow slats (crisp, aligned 1x1m grid aesthetic, no awkward bloated geometry)
+      const furrowCount = 5;
+      const furrowSpacing = (d - 1.6) / (furrowCount - 1);
+      const furrowGeo = new THREE.BoxGeometry(w - 1.2, 0.02, 0.28);
+      const furrowMat = new THREE.MeshStandardMaterial({ color: 0x4a2e16, roughness: 0.95 });
       for (let f = 0; f < furrowCount; f++) {
-        const fZ = -d / 2 + 1.1 + f * furrowSpacing;
-        const furrow = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.38, 0.5, w - 1.4, 10),
-          soilMat
-        );
-        furrow.rotateZ(Math.PI / 2);
-        furrow.position.set(0, 0.16, fZ);
+        const fZ = -d / 2 + 0.8 + f * furrowSpacing;
+        const furrow = new THREE.Mesh(furrowGeo, furrowMat);
+        furrow.position.set(0, 0.05, fZ);
         furrow.receiveShadow = true;
         paddockGroup.add(furrow);
       }
@@ -1028,40 +1417,160 @@ export class World {
     const scGroup = new THREE.Group();
     scGroup.position.set(x, 0, z);
 
-    const woodMat = this.materials.timberLog;
-    const shirtMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.85, flatShading: true });
-    const burlapMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.9, flatShading: true });
-    const hatMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.8, flatShading: true });
+    const logMat = this.materials.timberLog;
+    const twineMat = this.materials.strawTwine;
+    const strawMat = this.materials.straw;
+    const flannelMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.85 }); // rustic red flannel
+    const denimMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.9 }); // blue denim
+    const burlapMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.95 }); // rustic burlap
+    const buttonMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 }); // dark button eyes
+    const hatMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 }); // weathered straw hat
+    const sunflowerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.5 }); // sunflower petals
 
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 2.8, 6), woodMat);
-    post.position.set(0, 1.4, 0);
+    // 1. Weathered Post & Crossbeam with Notched Joint & Twine Lashings
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.10, 2.9, 8), logMat);
+    post.position.set(0, 1.45, 0);
+    post.rotation.z = 0.04;
     post.castShadow = true;
     scGroup.add(post);
 
-    const arms = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.8, 6), woodMat);
-    arms.rotation.z = Math.PI / 2;
-    arms.position.set(0, 2.0, 0);
-    arms.castShadow = true;
-    scGroup.add(arms);
+    const crossbeam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), logMat);
+    crossbeam.rotation.z = Math.PI / 2;
+    crossbeam.position.set(0, 2.05, 0);
+    crossbeam.castShadow = true;
+    scGroup.add(crossbeam);
 
-    const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.45), shirtMat);
-    shirt.position.set(0, 1.8, 0);
-    shirt.castShadow = true;
-    scGroup.add(shirt);
+    // Crossed rope lashings at notch joint
+    const lashing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 6, 12), twineMat);
+    lashing.position.set(0, 2.05, 0);
+    scGroup.add(lashing);
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), burlapMat);
-    head.position.set(0, 2.4, 0);
+    // 2. Denim Dungarees / Rustic Trousers with Knee Patches
+    const pantL = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 1.0, 8), denimMat);
+    pantL.position.set(-0.16, 0.95, 0);
+    pantL.castShadow = true;
+    scGroup.add(pantL);
+
+    const pantR = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 1.0, 8), denimMat);
+    pantR.position.set(0.16, 0.95, 0);
+    pantR.castShadow = true;
+    scGroup.add(pantR);
+
+    // Stitched knee patch
+    const patch = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.04), burlapMat);
+    patch.position.set(-0.16, 0.9, 0.11);
+    scGroup.add(patch);
+
+    // Straw poking out of pant bottoms
+    for (let s = 0; s < 4; s++) {
+      const tuftL = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 5), strawMat);
+      tuftL.position.set(-0.16 + (s - 1.5) * 0.06, 0.4, 0);
+      tuftL.rotation.z = (s - 1.5) * 0.2;
+      scGroup.add(tuftL);
+
+      const tuftR = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 5), strawMat);
+      tuftR.position.set(0.16 + (s - 1.5) * 0.06, 0.4, 0);
+      tuftR.rotation.z = (s - 1.5) * 0.2;
+      scGroup.add(tuftR);
+    }
+
+    // 3. Patchwork Flannel Shirt
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.85, 0.42), flannelMat);
+    torso.position.set(0, 1.82, 0);
+    torso.castShadow = true;
+    scGroup.add(torso);
+
+    // Flannel sleeves along crossbeam
+    const sleeveL = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.75, 8), flannelMat);
+    sleeveL.rotation.z = Math.PI / 2;
+    sleeveL.position.set(-0.65, 2.05, 0);
+    sleeveL.castShadow = true;
+    scGroup.add(sleeveL);
+
+    const sleeveR = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.10, 0.75, 8), flannelMat);
+    sleeveR.rotation.z = Math.PI / 2;
+    sleeveR.position.set(0.65, 2.05, 0);
+    sleeveR.castShadow = true;
+    scGroup.add(sleeveR);
+
+    // Straw tufts spilling from cuffs
+    for (let s = 0; s < 3; s++) {
+      const tuftArmL = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.28, 5), strawMat);
+      tuftArmL.position.set(-1.05, 2.05 + (s - 1) * 0.05, 0);
+      tuftArmL.rotation.z = Math.PI / 2 + (s - 1) * 0.25;
+      scGroup.add(tuftArmL);
+
+      const tuftArmR = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.28, 5), strawMat);
+      tuftArmR.position.set(1.05, 2.05 + (s - 1) * 0.05, 0);
+      tuftArmR.rotation.z = -Math.PI / 2 + (s - 1) * 0.25;
+      scGroup.add(tuftArmR);
+    }
+
+    // Straw collar tufts
+    for (let c = 0; c < 4; c++) {
+      const collarTuft = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.18, 5), strawMat);
+      const ang = (c / 4) * Math.PI * 2;
+      collarTuft.position.set(Math.cos(ang) * 0.15, 2.26, Math.sin(ang) * 0.15);
+      collarTuft.rotation.z = Math.cos(ang) * 0.4;
+      collarTuft.rotation.x = Math.sin(ang) * 0.4;
+      scGroup.add(collarTuft);
+    }
+
+    // 4. Burlap Sack Head with Button Eyes and Stitched Grin
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), burlapMat);
+    head.scale.set(1.0, 1.15, 1.0);
+    head.position.set(0, 2.52, 0);
     head.castShadow = true;
     scGroup.add(head);
 
-    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.05, 8), hatMat);
-    hatBrim.position.set(0, 2.55, 0);
+    // Neck tie string
+    const neckTie = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.025, 6, 12), twineMat);
+    neckTie.rotation.x = Math.PI / 2;
+    neckTie.position.set(0, 2.26, 0);
+    scGroup.add(neckTie);
+
+    // Dark button eyes
+    const eyeGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.03, 8);
+    const eyeL = new THREE.Mesh(eyeGeo, buttonMat);
+    eyeL.rotation.x = Math.PI / 2;
+    eyeL.position.set(-0.10, 2.56, 0.26);
+    scGroup.add(eyeL);
+
+    const eyeR = new THREE.Mesh(eyeGeo, buttonMat);
+    eyeR.rotation.x = Math.PI / 2;
+    eyeR.position.set(0.10, 2.56, 0.26);
+    scGroup.add(eyeR);
+
+    // Stitched smile
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(0.10, 0.015, 4, 8, Math.PI * 0.8), twineMat);
+    smile.rotation.x = 0.2;
+    smile.rotation.z = Math.PI;
+    smile.position.set(0, 2.42, 0.26);
+    scGroup.add(smile);
+
+    // 5. Floppy Straw Hat with Sunflower
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.04, 12), hatMat);
+    hatBrim.position.set(0, 2.72, 0);
+    hatBrim.rotation.z = 0.12;
+    hatBrim.rotation.x = -0.06;
     scGroup.add(hatBrim);
 
-    const hatCone = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.45, 8), hatMat);
-    hatCone.position.set(0, 2.8, 0);
-    hatCone.rotation.z = 0.15;
-    scGroup.add(hatCone);
+    const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.32, 0.38, 10), hatMat);
+    hatCrown.position.set(0.04, 2.92, -0.02);
+    hatCrown.rotation.z = 0.16;
+    hatCrown.castShadow = true;
+    scGroup.add(hatCrown);
+
+    // Sunflower on hat band
+    const flower = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 10), sunflowerMat);
+    flower.rotation.x = Math.PI / 2;
+    flower.position.set(-0.16, 2.80, 0.24);
+    scGroup.add(flower);
+
+    const flowerCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.04, 8), buttonMat);
+    flowerCenter.rotation.x = Math.PI / 2;
+    flowerCenter.position.set(-0.16, 2.80, 0.26);
+    scGroup.add(flowerCenter);
 
     this.scene.add(scGroup);
   }
@@ -1568,18 +2077,18 @@ export class World {
 
 
     // 2. SLENDER BIRCH TREES
-    // Grouped into picturesque natural copses framing knolls and meadows
+    // Picturesque natural copses with organic tapered trunks and weeping layered foliage
     const birchLocations = [
       // Terrace hillside copses (framing chalet knoll)
       { x: -16.5, z: -27.0, h: 5.2 },
       { x: -19.5, z: -29.5, h: 4.8 },
       { x: 16.5,  z: -27.0, h: 5.0 },
       { x: 19.5,  z: -29.5, h: 5.4 },
-      // Scenic northern forest knoll copses
-      { x: -14.0, z: -43.0, h: 5.3 },
-      { x: -17.5, z: -45.0, h: 4.7 },
-      { x: 14.0,  z: -43.0, h: 5.1 },
-      { x: 18.0,  z: -44.5, h: 5.5 },
+      // Scenic northern forest knoll copses (repositioned in front of boundary wall)
+      { x: -14.0, z: -39.5, h: 5.3 },
+      { x: -17.5, z: -40.5, h: 4.7 },
+      { x: 14.0,  z: -39.5, h: 5.1 },
+      { x: 18.0,  z: -40.5, h: 5.5 },
       // West well plaza shaded copse
       { x: -22.5, z: -7.0,  h: 4.9 },
       { x: -25.0, z: -9.5,  h: 5.2 },
@@ -1593,39 +2102,69 @@ export class World {
       bGroup.position.set(bl.x, 0, bl.z);
 
       const bTrunkH = bl.h || 5.0;
-      // Slender smooth trunk (16 radial segments, smooth shading)
-      const bTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.25, bTrunkH, 16), this.materials.birchTrunk);
-      bTrunk.position.set(0, bTrunkH / 2, 0);
-      bTrunk.castShadow = true;
-      bGroup.add(bTrunk);
 
-      for (let r = 0; r < 5; r++) {
-        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.185, 0.185, 0.08, 16), this.materials.birchSpots);
-        ring.position.set(0, 0.9 + r * 0.9, 0);
+      // Naturally curved organic slender birch trunk (3 connected tapered segments)
+      const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.8, 12), this.materials.birchTrunk);
+      seg1.position.set(0, 0.9, 0);
+      seg1.castShadow = true;
+      bGroup.add(seg1);
+
+      const seg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 1.7, 12), this.materials.birchTrunk);
+      seg2.position.set(0.06, 2.55, 0.04);
+      seg2.rotation.z = -0.05;
+      seg2.castShadow = true;
+      bGroup.add(seg2);
+
+      const seg3 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 1.6, 12), this.materials.birchTrunk);
+      seg3.position.set(0.12, 4.05, 0.08);
+      seg3.rotation.z = 0.06;
+      seg3.castShadow = true;
+      bGroup.add(seg3);
+
+      // Stylized birch lenticel rings & dark markings
+      for (let r = 0; r < 6; r++) {
+        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.17 - r * 0.015, 0.17 - r * 0.015, 0.06, 12), this.materials.birchSpots);
+        ring.position.set(0.02 * r, 0.6 + r * 0.7, 0.01 * r);
         bGroup.add(ring);
       }
 
-      // Slender branching limb
-      const bLimb = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.3, 10), this.materials.birchTrunk);
-      bLimb.position.set(0.35, 3.2, 0.15);
-      bLimb.rotation.z = -0.7;
-      bGroup.add(bLimb);
+      // 3 graceful secondary branches
+      const branchGeo = new THREE.CylinderGeometry(0.04, 0.07, 1.3, 8);
+      const br1 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
+      br1.position.set(-0.35, 3.4, 0.1);
+      br1.rotation.z = 0.75;
+      br1.rotation.y = 0.4;
+      bGroup.add(br1);
 
-      // Smooth Rounded Foliage Clusters (delicate weeping birch canopy)
-      const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.35, 20, 16), this.materials.birchLeaf);
-      c1.position.set(-0.35, 3.8, 0.2);
-      c1.castShadow = true;
-      bGroup.add(c1);
+      const br2 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
+      br2.position.set(0.42, 3.8, -0.15);
+      br2.rotation.z = -0.7;
+      br2.rotation.y = -0.5;
+      bGroup.add(br2);
 
-      const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.45, 20, 16), this.materials.birchLeaf);
-      c2.position.set(0.45, 4.3, -0.2);
-      c2.castShadow = true;
-      bGroup.add(c2);
+      const br3 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
+      br3.position.set(0.05, 4.4, 0.38);
+      br3.rotation.x = -0.7;
+      bGroup.add(br3);
 
-      const c3 = new THREE.Mesh(new THREE.SphereGeometry(1.2, 20, 16), this.materials.leafSun);
-      c3.position.set(0.05, 5.2, 0.05);
-      c3.castShadow = true;
-      bGroup.add(c3);
+      // Layered weeping birch foliage fronds (flattened drooping ellipsoidal masses with natural sway)
+      const weepingFoliage = [
+        { x: -0.65, y: 3.4, z: 0.2, sx: 1.1, sy: 0.65, sz: 1.0, mat: this.materials.birchLeaf },
+        { x: 0.75, y: 3.8, z: -0.2, sx: 1.2, sy: 0.7, sz: 1.1, mat: this.materials.birchLeaf },
+        { x: 0.1, y: 4.4, z: 0.65, sx: 1.0, sy: 0.65, sz: 1.0, mat: this.materials.leafSun },
+        { x: -0.25, y: 4.8, z: -0.3, sx: 1.3, sy: 0.75, sz: 1.2, mat: this.materials.birchLeaf },
+        { x: 0.2, y: 5.5, z: 0.1, sx: 1.1, sy: 0.7, sz: 1.0, mat: this.materials.leafSun },
+        { x: 0.0, y: 6.1, z: 0.0, sx: 0.8, sy: 0.6, sz: 0.8, mat: this.materials.leafSun }
+      ];
+
+      weepingFoliage.forEach(wf => {
+        const cluster = new THREE.Mesh(new THREE.SphereGeometry(1.0, 14, 10), wf.mat);
+        cluster.scale.set(wf.sx, wf.sy, wf.sz);
+        cluster.position.set(wf.x, wf.y, wf.z);
+        cluster.castShadow = true;
+        cluster.receiveShadow = true;
+        bGroup.add(cluster);
+      });
 
       this.scene.add(bGroup);
 
@@ -1636,15 +2175,15 @@ export class World {
         new THREE.Vector3(bl.x - bRadius, 0, bl.z - bRadius),
         new THREE.Vector3(bl.x + bRadius, bTrunkH, bl.z + bRadius)
       );
-      this.world.colliders.push({ box: bBox, mesh: bTrunk, type: 'solid', isCylinder: true });
+      this.world.colliders.push({ box: bBox, mesh: seg1, type: 'solid', isCylinder: true });
     });
 
     // 3. TIERED ALPINE PINES / FIRS
     // Dense, layered evergreen forest belt naturally framing valley perimeter
     const pineLocations = [
-      // North mountain boundary forest (behind farmhouse knoll)
-      { x: -28, z: -52, h: 8.5 }, { x: -22, z: -54, h: 9.2 }, { x: -15, z: -51, h: 7.8 },
-      { x: 0,   z: -54, h: 9.0 }, { x: 15,  z: -51, h: 8.0 }, { x: 22,  z: -54, h: 9.5 }, { x: 28, z: -52, h: 8.2 },
+      // North mountain boundary forest (repositioned in front of rock wall)
+      { x: -28, z: -41.5, h: 8.5 }, { x: -22, z: -42.0, h: 9.2 }, { x: -15, z: -41.0, h: 7.8 },
+      { x: 0,   z: -42.0, h: 9.0 }, { x: 15,  z: -41.0, h: 8.0 }, { x: 22,  z: -42.0, h: 9.5 }, { x: 28, z: -41.5, h: 8.2 },
       // East foothill forest belt
       { x: 44, z: -30, h: 8.0 }, { x: 47, z: -22, h: 9.0 }, { x: 45, z: -12, h: 7.6 },
       { x: 48, z: 2,   h: 8.8 }, { x: 44, z: 14,  h: 7.9 }, { x: 47, z: 26,  h: 8.5 },
@@ -1661,21 +2200,45 @@ export class World {
       pineGroup.position.set(p.x, 0, p.z);
 
       const pTrunkH = p.h || 7.5;
-      // Sturdy smooth conifer trunk (16 radial segments, smooth shading)
-      const pTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.44, pTrunkH, 16), trunkMat);
+      // Rugged tapered conifer trunk
+      const pTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.48, pTrunkH, 14), trunkMat);
       pTrunk.position.set(0, pTrunkH / 2, 0);
       pTrunk.castShadow = true;
       pineGroup.add(pTrunk);
 
-      // Smooth Tiered Conical Boughs (20 radial segments with smooth shading)
-      const tiers = 4;
+      // Root flares at base
+      for (let rf = 0; rf < 4; rf++) {
+        const flare = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.7, 5), trunkMat);
+        const ang = (rf / 4) * Math.PI * 2;
+        flare.position.set(Math.cos(ang) * 0.42, 0.35, Math.sin(ang) * 0.42);
+        flare.rotation.z = Math.cos(ang) * 0.25;
+        flare.rotation.x = Math.sin(ang) * 0.25;
+        pineGroup.add(flare);
+      }
+
+      // 5 crisp faceted tiers of needle boughs with alternating faceted skirts and shadow skirts
+      const tiers = 5;
       for (let tier = 0; tier < tiers; tier++) {
-        const tierH = 2.4 - tier * 0.35;
-        const tierR = 2.6 - tier * 0.45;
-        const bough = new THREE.Mesh(new THREE.ConeGeometry(tierR, tierH, 20), this.materials.leafPine);
-        bough.position.set(0, 3.2 + tier * 1.3, 0);
+        const tierProgress = tier / (tiers - 1);
+        const tierH = 2.2 - tierProgress * 0.6;
+        const tierR = 2.8 - tierProgress * 1.5;
+        const tierY = 2.6 + tier * 1.35;
+
+        // Faceted skirt cone
+        const bough = new THREE.Mesh(new THREE.ConeGeometry(tierR, tierH, 10), tierProgress > 0.6 ? this.materials.leafSun : this.materials.leafPine);
+        bough.scale.set(1.15, 0.75, 1.15);
+        bough.position.set(0, tierY, 0);
+        bough.rotation.y = tier * 0.45;
         bough.castShadow = true;
+        bough.receiveShadow = true;
         pineGroup.add(bough);
+
+        // Underside needle shadow skirt
+        const underSkirt = new THREE.Mesh(new THREE.ConeGeometry(tierR * 0.92, 0.3, 10), this.materials.leafDeep);
+        underSkirt.scale.set(1.1, 0.6, 1.1);
+        underSkirt.position.set(0, tierY - tierH * 0.25, 0);
+        underSkirt.rotation.y = tier * 0.45 + 0.2;
+        pineGroup.add(underSkirt);
       }
 
       this.scene.add(pineGroup);
@@ -1847,47 +2410,170 @@ export class World {
 
     const stoneMat = this.materials.stoneWall;
     const woodMat = this.materials.wood;
+    const logMat = this.materials.timberLog;
+    const ironMat = this.materials.ironMetal;
+    const roofMat = this.materials.roof;
 
-    const wellBase = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.95, 16), stoneMat);
-    wellBase.position.set(0, 0.47, 0);
-    wellBase.castShadow = true;
-    wellBase.receiveShadow = true;
-    group.add(wellBase);
+    // 1. Dressed Circular Stone Curb with Coping Stones
+    const curbOuter = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.55, 0.95, 18), stoneMat);
+    curbOuter.position.set(0, 0.475, 0);
+    curbOuter.castShadow = true;
+    curbOuter.receiveShadow = true;
+    group.add(curbOuter);
 
-    const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.2, 1.2, 0.1, 14),
-      new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.1, metalness: 0.3 })
+    // Stone coping rim (rounded upper lip)
+    const copingRim = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.12, 8, 18), stoneMat);
+    copingRim.rotation.x = Math.PI / 2;
+    copingRim.position.set(0, 0.95, 0);
+    copingRim.castShadow = true;
+    group.add(copingRim);
+
+    // Dark well interior shaft
+    const shaftInner = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.22, 1.22, 0.92, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95 })
     );
-    water.position.set(0, 0.75, 0);
+    shaftInner.position.set(0, 0.46, 0);
+    group.add(shaftInner);
+
+    // 2. Shimmering Water Surface inside
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.2, 0.05, 16),
+      new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        roughness: 0.08,
+        metalness: 0.35,
+        transparent: true,
+        opacity: 0.88
+      })
+    );
+    water.position.set(0, 0.55, 0);
     group.add(water);
 
-    const postG = new THREE.CylinderGeometry(0.1, 0.1, 2.3, 7);
-    const p1 = new THREE.Mesh(postG, woodMat); p1.position.set(-1.1, 1.4, 0); group.add(p1);
-    const p2 = new THREE.Mesh(postG, woodMat); p2.position.set(1.1, 1.4, 0); group.add(p2);
+    // 3. Heavy Timber A-Frame Uprights
+    const postGeo = new THREE.BoxGeometry(0.18, 2.7, 0.18);
+    const p1 = new THREE.Mesh(postGeo, logMat);
+    p1.position.set(-1.25, 1.45, 0);
+    p1.castShadow = true;
+    group.add(p1);
 
-    const roofG = new THREE.ConeGeometry(1.8, 1.1, 4);
-    roofG.rotateY(Math.PI / 4);
-    const roof = new THREE.Mesh(roofG, this.materials.roof);
-    roof.position.set(0, 2.9, 0);
-    roof.castShadow = true;
-    group.add(roof);
+    const p2 = new THREE.Mesh(postGeo, logMat);
+    p2.position.set(1.25, 1.45, 0);
+    p2.castShadow = true;
+    group.add(p2);
 
-    const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.16, 0.35, 7), woodMat);
-    bucket.position.set(0, 1.4, 0);
-    group.add(bucket);
+    // A-frame diagonal braces
+    [-1.25, 1.25].forEach(px => {
+      const braceL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.1), logMat);
+      braceL.position.set(px, 2.2, 0.32);
+      braceL.rotation.x = 0.65;
+      group.add(braceL);
+
+      const braceR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.1), logMat);
+      braceR.position.set(px, 2.2, -0.32);
+      braceR.rotation.x = -0.65;
+      group.add(braceR);
+    });
+
+    // Top crossbeam
+    const crossbeam = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.18, 0.18), logMat);
+    crossbeam.position.set(0, 2.65, 0);
+    crossbeam.castShadow = true;
+    group.add(crossbeam);
+
+    // 4. Wooden Winch Drum with Wrapped Rope
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.6, 12), woodMat);
+    drum.rotation.z = Math.PI / 2;
+    drum.position.set(0, 2.25, 0);
+    drum.castShadow = true;
+    group.add(drum);
+
+    // Coiled hemp rope around drum
+    const ropeCoil = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.65, 12), this.materials.strawTwine);
+    ropeCoil.rotation.z = Math.PI / 2;
+    ropeCoil.position.set(0, 2.25, 0);
+    group.add(ropeCoil);
+
+    // 5. Iron Crank Handle
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.45, 8), ironMat);
+    axle.rotation.z = Math.PI / 2;
+    axle.position.set(1.42, 2.25, 0);
+    group.add(axle);
+
+    const crankArm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), ironMat);
+    crankArm.position.set(1.62, 2.1, 0);
+    group.add(crankArm);
+
+    const crankGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.22, 8), woodMat);
+    crankGrip.rotation.x = Math.PI / 2;
+    crankGrip.position.set(1.62, 1.92, 0.1);
+    group.add(crankGrip);
+
+    // 6. Suspended Wooden Bucket with Iron Hoops
+    const hangingRope = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.95, 6), this.materials.strawTwine);
+    hangingRope.position.set(0, 1.75, 0);
+    group.add(hangingRope);
+
+    const bucketGroup = new THREE.Group();
+    bucketGroup.position.set(0, 1.15, 0);
+
+    const bucketBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.38, 10), woodMat);
+    bucketBody.castShadow = true;
+    bucketGroup.add(bucketBody);
+
+    const hoop1 = new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.235, 0.04, 10), ironMat);
+    hoop1.position.set(0, 0.1, 0);
+    bucketGroup.add(hoop1);
+
+    const hoop2 = new THREE.Mesh(new THREE.CylinderGeometry(0.205, 0.195, 0.04, 10), ironMat);
+    hoop2.position.set(0, -0.1, 0);
+    bucketGroup.add(hoop2);
+
+    const bailHandle = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 12), ironMat);
+    bailHandle.position.set(0, 0.18, 0);
+    bucketGroup.add(bailHandle);
+    group.add(bucketGroup);
+
+    // 7. Shingled Gable Roof Canopy with Overhanging Eaves
+    const roofPitch = 0.65; // ~37 degrees
+    const rSlopeL = 1.6;
+    const rSlopeW = 2.95;
+
+    // South roof pitch
+    const roofSouth = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW, 0.14, rSlopeL), roofMat);
+    roofSouth.position.set(0, 3.1, 0.62);
+    roofSouth.rotation.x = roofPitch;
+    roofSouth.castShadow = true;
+    roofSouth.receiveShadow = true;
+    group.add(roofSouth);
+
+    // North roof pitch
+    const roofNorth = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW, 0.14, rSlopeL), roofMat);
+    roofNorth.position.set(0, 3.1, -0.62);
+    roofNorth.rotation.x = -roofPitch;
+    roofNorth.castShadow = true;
+    roofNorth.receiveShadow = true;
+    group.add(roofNorth);
+
+    // Ridge cap beam
+    const ridgeCap = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW + 0.15, 0.18, 0.28), logMat);
+    ridgeCap.position.set(0, 3.65, 0);
+    ridgeCap.castShadow = true;
+    group.add(ridgeCap);
 
     this.scene.add(group);
 
+    // Solid Collider enclosing well curb
     const wellBox = new THREE.Box3(
-      new THREE.Vector3(x - 1.5, 0, z - 1.5),
-      new THREE.Vector3(x + 1.5, 1.2, z + 1.5)
+      new THREE.Vector3(x - 1.6, 0, z - 1.6),
+      new THREE.Vector3(x + 1.6, 1.4, z + 1.6)
     );
-    this.world.colliders.push({ box: wellBox, mesh: wellBase, type: 'solid' });
+    this.world.colliders.push({ box: wellBox, mesh: curbOuter, type: 'solid' });
 
     // Interactive Stone Well for refilling Watering Can
     this.interactables.push({
       id: 'stone_well',
-      mesh: wellBase,
+      mesh: curbOuter,
       name: 'Stone Well',
       prompt: 'Refill Watering Can',
       ready: true,

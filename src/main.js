@@ -546,6 +546,30 @@ if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(19.8, 1.48, -5.4));
   player.yaw = -0.74;
   player.pitch = 0.50;
+} else if (urlParams.get('cam') === 'house-exterior') {
+  player.respawn(new THREE.Vector3(0, 1.2, -18.5));
+  player.yaw = 0.0;
+  player.pitch = 0.12;
+} else if (urlParams.get('cam') === 'house-interior') {
+  player.respawn(new THREE.Vector3(162.0, 1.2, 162.0));
+  player.yaw = 0.55;
+  player.pitch = -0.05;
+} else if (urlParams.get('cam') === 'well') {
+  player.respawn(new THREE.Vector3(-13.0, 1.2, -8.0));
+  player.yaw = 1.57;
+  player.pitch = -0.08;
+} else if (urlParams.get('cam') === 'scarecrow') {
+  player.respawn(new THREE.Vector3(-16.0, 1.2, 19.0));
+  player.yaw = 0.0;
+  player.pitch = 0.06;
+} else if (urlParams.get('cam') === 'crops') {
+  player.respawn(new THREE.Vector3(-8.5, 1.45, 4.0));
+  player.yaw = 1.42;
+  player.pitch = -0.25;
+} else if (urlParams.get('cam') === 'boundary') {
+  player.respawn(new THREE.Vector3(-10.0, 1.4, -33.0));
+  player.yaw = 0.0;
+  player.pitch = 0.15;
 }
 
 const timeParam = urlParams.get('time');
