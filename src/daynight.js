@@ -599,10 +599,12 @@ export class DayNightCycle {
     // 3. Directional Sun & Moon Lights
     this.sunLight.intensity = state.sunIntensity;
     this.sunLight.color.copy(state.sunColor);
+    this.sunLight.castShadow = (state.sunIntensity > 0.05);
     this.sunMesh.visible = (state.sunPos.y > -8 && state.sunIntensity > 0.05);
 
     this.moonLight.intensity = state.moonIntensity;
     this.moonLight.color.copy(state.moonColor);
+    this.moonLight.castShadow = (state.moonIntensity > 0.05);
     this.moonMesh.visible = (state.moonPos.y > -8 && state.moonIntensity > 0.05);
 
     // 4. Hemisphere & Ambient Lights

@@ -9,6 +9,7 @@ import { DayNightCycle } from './daynight.js';
 import { saveManager } from './save.js';
 import { events } from './events.js';
 import { FarmingManager, CROPS, TOOLS } from './farming.js';
+import { assetPipeline } from './assetPipeline.js';
 
 // 1. Scene, Camera, Renderer Setup
 const container = document.getElementById('canvas-container');
@@ -35,6 +36,8 @@ const world = new World(scene, collisionWorld, particleManager);
 const timeManager = new TimeManager();
 const dayNightCycle = new DayNightCycle(scene, timeManager, world, renderer);
 const farmingManager = new FarmingManager(scene, collisionWorld, particleManager, timeManager);
+
+window.assetPipeline = assetPipeline;
 
 // Connect farming manager to player & world interactables
 player.farmingManager = farmingManager;
@@ -570,6 +573,18 @@ if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(-10.0, 1.4, -33.0));
   player.yaw = 0.0;
   player.pitch = 0.15;
+} else if (urlParams.get('cam') === 'grid-alignment') {
+  player.respawn(new THREE.Vector3(-4.2, 1.5, 3.0));
+  player.yaw = -1.57;
+  player.pitch = -0.42;
+} else if (urlParams.get('cam') === 'boundary-north') {
+  player.respawn(new THREE.Vector3(0, 1.4, -36.0));
+  player.yaw = 0.0;
+  player.pitch = 0.15;
+} else if (urlParams.get('cam') === 'boundary-feedback') {
+  player.respawn(new THREE.Vector3(-2.8, 1.2, 3.0));
+  player.yaw = -1.57;
+  player.pitch = -0.35;
 }
 
 const timeParam = urlParams.get('time');

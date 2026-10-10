@@ -306,6 +306,26 @@ export class FarmingManager {
       }
     }
 
+    // 6.5. Collision obstacles (fence posts, buildings, scarecrow, signposts)
+    if (this.collisionWorld && this.collisionWorld.colliders) {
+      const tileBox = new THREE.Box3(
+        new THREE.Vector3(gx - 0.45, 0.08, gz - 0.45),
+        new THREE.Vector3(gx + 0.45, 2.0, gz + 0.45)
+      );
+      for (const col of this.collisionWorld.colliders) {
+        if (!col.box) continue;
+        // Skip ground plane and perimeter barrier walls
+        if (col.type === 'ground' || col.box.max.y <= 0.08) continue;
+        const width = col.box.max.x - col.box.min.x;
+        const depth = col.box.max.z - col.box.min.z;
+        if (width >= 80 || depth >= 80) continue; // Boundary wall
+
+        if (tileBox.intersectsBox(col.box)) {
+          return { valid: false, reason: 'Blocked by obstacle' };
+        }
+      }
+    }
+
     // 7. Strictly enforce designated Arable Farming Zones in Meadow Valley
     // (Restricts tilling on mountains, paths, knolls, forests, and wild meadows)
     const inArableZone = (
@@ -363,27 +383,33 @@ export class FarmingManager {
       let valid = true;
       let promptText = '';
       let actionType = 'none';
+      let reason = '';
 
       if (activeTool.id === 'hoe') {
         if (existingTile) {
           valid = false;
           promptText = 'Tile is already tilled';
+          reason = 'Tile is already tilled';
         } else {
           const check = this.canTill(gx, gz);
           valid = check.valid;
           promptText = valid ? '[LMB] Till Farmland (8 Stamina)' : (check.reason || 'Cannot till here');
+          reason = valid ? '' : (check.reason || 'Cannot till here');
           actionType = 'till';
         }
       } else if (activeTool.id === 'water_can') {
         if (!existingTile) {
           valid = false;
           promptText = 'Till soil before watering';
+          reason = 'Till soil before watering';
         } else if (existingTile.isWatered) {
           valid = false;
           promptText = 'Soil is already watered today';
+          reason = 'Soil is already watered today';
         } else if (this.wateringCanCurrent <= 0) {
           valid = false;
           promptText = '💧 Watering Can is Empty! Refill at Well [E]';
+          reason = 'Watering can is empty! Refill at Well [E]';
         } else {
           valid = true;
           promptText = `[LMB] Water Soil (💧 ${this.wateringCanCurrent}/${this.wateringCanMax})`;
@@ -396,12 +422,15 @@ export class FarmingManager {
         if (!existingTile) {
           valid = false;
           promptText = 'Till soil before planting';
+          reason = 'Till soil before planting';
         } else if (existingTile.crop) {
           valid = false;
           promptText = `Tile occupied by ${CROPS[existingTile.crop.type]?.name || 'crop'}`;
+          reason = `Tile occupied by ${CROPS[existingTile.crop.type]?.name || 'crop'}`;
         } else if (seedCount <= 0) {
           valid = false;
           promptText = `No ${cropDef.seedName} in backpack! [Take free seeds at crate]`;
+          reason = `No ${cropDef.seedName} in backpack! Take free seeds at crate`;
         } else {
           valid = true;
           promptText = `[LMB] Plant ${cropDef.name} (Seeds: ${seedCount})`;
@@ -411,6 +440,7 @@ export class FarmingManager {
         if (!existingTile) {
           valid = false;
           promptText = 'Nothing to clear';
+          reason = 'Nothing to clear';
         } else {
           valid = true;
           promptText = existingTile.crop
@@ -434,7 +464,8 @@ export class FarmingManager {
         existingTile,
         valid,
         promptText,
-        actionType
+        actionType,
+        reason
       };
 
       // Update visual selector
@@ -458,7 +489,7 @@ export class FarmingManager {
    */
   useActiveTool(player) {
     if (!this.targetedTile) return false;
-    const { gx, gz, key, valid, actionType, existingTile } = this.targetedTile;
+    const { gx, gz, key, valid, actionType, existingTile, reason } = this.targetedTile;
     const activeTool = TOOLS[this.activeToolIndex];
 
     // Check stamina
@@ -472,6 +503,14 @@ export class FarmingManager {
     }
 
     if (!valid && actionType !== 'harvest') {
+      const msg = reason || (actionType === 'till' ? 'Cannot till here' : 'Invalid farming action');
+      const evt = new CustomEvent('game:message', {
+        detail: { message: `⚠️ ${msg}` }
+      });
+      window.dispatchEvent(evt);
+      if (sounds.playActionFailed) {
+        sounds.playActionFailed();
+      }
       return false;
     }
 

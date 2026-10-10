@@ -615,41 +615,41 @@ export class World {
     // Prevents player from climbing mountains, glitching into rocks, or leaving playable valley floor
     const barrierMat = new THREE.MeshBasicMaterial({ visible: false });
 
-    // North Mountain Barrier Wall (at z=-43, immediately behind farmhouse knoll & pine tree line)
-    const northWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 8), barrierMat);
-    northWall.position.set(0, 15, -43.0);
+    // North Mountain Barrier Wall (at z=-44.5, front edge z=-42.5 safely behind trees and chalet)
+    const northWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 4), barrierMat);
+    northWall.position.set(0, 15, -44.5);
     this.scene.add(northWall);
     this.world.addBoxCollider(northWall);
 
-    // South Valley Meadow Barrier Wall (at z=49)
-    const southWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 8), barrierMat);
-    southWall.position.set(0, 15, 49.0);
+    // South Valley Meadow Barrier Wall (at z=48.0, front edge z=46.0 safely behind southern tree belt)
+    const southWall = new THREE.Mesh(new THREE.BoxGeometry(110, 30, 4), barrierMat);
+    southWall.position.set(0, 15, 48.0);
     this.scene.add(southWall);
     this.world.addBoxCollider(southWall);
 
-    // West Ridge Barrier Wall (at x=-51, behind apple orchard)
-    const westWall = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 105), barrierMat);
-    westWall.position.set(-51.0, 15, 3.0);
+    // West Ridge Barrier Wall (at x=-50.0, inner edge x=-48.0 behind apple orchard)
+    const westWall = new THREE.Mesh(new THREE.BoxGeometry(4, 30, 105), barrierMat);
+    westWall.position.set(-50.0, 15, 2.0);
     this.scene.add(westWall);
     this.world.addBoxCollider(westWall);
 
-    // East Foothill Barrier Wall (at x=51, behind east paddocks & picnic grove)
-    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 105), barrierMat);
-    eastWall.position.set(51.0, 15, 3.0);
+    // East Foothill Barrier Wall (at x=50.0, inner edge x=48.0 behind east paddocks & grove)
+    const eastWall = new THREE.Mesh(new THREE.BoxGeometry(4, 30, 105), barrierMat);
+    eastWall.position.set(50.0, 15, 2.0);
     this.scene.add(eastWall);
     this.world.addBoxCollider(eastWall);
 
     // 4 Diagonal Corner Wedges (sealing the perimeter completely)
-    const cornerGeo = new THREE.BoxGeometry(26, 30, 12);
+    const cornerGeo = new THREE.BoxGeometry(26, 30, 10);
 
     const nwWedge = new THREE.Mesh(cornerGeo, barrierMat);
-    nwWedge.position.set(-42, 15, -36);
+    nwWedge.position.set(-42, 15, -38);
     nwWedge.rotation.y = Math.PI / 4;
     this.scene.add(nwWedge);
     this.world.addBoxCollider(nwWedge);
 
     const neWedge = new THREE.Mesh(cornerGeo, barrierMat);
-    neWedge.position.set(42, 15, -36);
+    neWedge.position.set(42, 15, -38);
     neWedge.rotation.y = -Math.PI / 4;
     this.scene.add(neWedge);
     this.world.addBoxCollider(neWedge);
@@ -1131,10 +1131,10 @@ export class World {
       intGroup.add(emberLog);
     }
 
-    // Warm Hearth Point Light
+    // Warm Hearth Point Light (optimized without redundant 6-face cubemap shadows)
     const hearthLight = new THREE.PointLight(0xff7a18, 2.8, 14, 1.5);
     hearthLight.position.set(0, 1.1, -5.2);
-    hearthLight.castShadow = true;
+    hearthLight.castShadow = false;
     intGroup.add(hearthLight);
 
     // Hearth Rug in front of fireplace
@@ -2181,18 +2181,18 @@ export class World {
     // 3. TIERED ALPINE PINES / FIRS
     // Dense, layered evergreen forest belt naturally framing valley perimeter
     const pineLocations = [
-      // North mountain boundary forest (repositioned in front of rock wall)
-      { x: -28, z: -41.5, h: 8.5 }, { x: -22, z: -42.0, h: 9.2 }, { x: -15, z: -41.0, h: 7.8 },
-      { x: 0,   z: -42.0, h: 9.0 }, { x: 15,  z: -41.0, h: 8.0 }, { x: 22,  z: -42.0, h: 9.5 }, { x: 28, z: -41.5, h: 8.2 },
-      // East foothill forest belt
-      { x: 44, z: -30, h: 8.0 }, { x: 47, z: -22, h: 9.0 }, { x: 45, z: -12, h: 7.6 },
-      { x: 48, z: 2,   h: 8.8 }, { x: 44, z: 14,  h: 7.9 }, { x: 47, z: 26,  h: 8.5 },
-      // South valley entrance woodlands
-      { x: -32, z: 46, h: 8.2 }, { x: -24, z: 49, h: 9.0 }, { x: -14, z: 46, h: 7.5 },
-      { x: 14,  z: 46, h: 7.8 }, { x: 24,  z: 49, h: 9.2 }, { x: 32,  z: 46, h: 8.4 },
-      // West garden & ridge forest belt
-      { x: -44, z: -28, h: 8.2 }, { x: -48, z: -18, h: 9.1 }, { x: -45, z: -6,  h: 7.8 },
-      { x: -48, z: 8,   h: 8.7 }, { x: -44, z: 20,  h: 7.9 }, { x: -47, z: 32,  h: 8.6 }
+      // North mountain boundary forest (repositioned in front of rock wall at z=-42.5)
+      { x: -28, z: -41.2, h: 8.5 }, { x: -22, z: -41.5, h: 9.2 }, { x: -15, z: -41.0, h: 7.8 },
+      { x: 0,   z: -41.2, h: 9.0 }, { x: 15,  z: -41.0, h: 8.0 }, { x: 22,  z: -41.4, h: 9.5 }, { x: 28, z: -41.2, h: 8.2 },
+      // East foothill forest belt (in front of east wall at x=48.0)
+      { x: 44, z: -30, h: 8.0 }, { x: 46, z: -22, h: 9.0 }, { x: 45, z: -12, h: 7.6 },
+      { x: 46, z: 2,   h: 8.8 }, { x: 44, z: 14,  h: 7.9 }, { x: 46, z: 26,  h: 8.5 },
+      // South valley entrance woodlands (in front of south wall at z=46.0)
+      { x: -32, z: 44.5, h: 8.2 }, { x: -24, z: 45.0, h: 9.0 }, { x: -14, z: 44.0, h: 7.5 },
+      { x: 14,  z: 44.0, h: 7.8 }, { x: 24,  z: 45.0, h: 9.2 }, { x: 32,  z: 44.5, h: 8.4 },
+      // West garden & ridge forest belt (in front of west wall at x=-48.0)
+      { x: -44, z: -28, h: 8.2 }, { x: -46, z: -18, h: 9.1 }, { x: -45, z: -6,  h: 7.8 },
+      { x: -46, z: 8,   h: 8.7 }, { x: -44, z: 20,  h: 7.9 }, { x: -46, z: 32,  h: 8.6 }
     ];
 
     pineLocations.forEach(p => {
