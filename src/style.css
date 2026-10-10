@@ -641,3 +641,183 @@ body, html {
   margin-top: 6px;
   text-align: center;
 }
+
+/* ================= FARMING TOOLS HOTBAR ================= */
+.tools-hotbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  pointer-events: auto;
+}
+
+.tool-slot {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.tool-slot:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: translateY(-2px);
+}
+
+.tool-slot.active {
+  background: rgba(34, 197, 94, 0.22);
+  border-color: #22c55e;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.5), inset 0 0 8px rgba(34, 197, 94, 0.25);
+  transform: translateY(-3px);
+}
+
+.slot-key {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  color: #cbd5e1;
+}
+
+.tool-slot.active .slot-key {
+  color: #86efac;
+}
+
+.slot-icon {
+  font-size: 20px;
+  margin-top: 2px;
+}
+
+.slot-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e2e8f0;
+  line-height: 1;
+  margin-top: 2px;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.water-badge, .seed-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+  line-height: 1.1;
+}
+
+.water-badge {
+  background: rgba(2, 132, 199, 0.85);
+  color: #e0f2fe;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.seed-badge {
+  background: rgba(217, 119, 6, 0.85);
+  color: #fef3c7;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
+
+/* ================= FARMING TUTORIAL BANNER ================= */
+.tutorial-banner {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 16px rgba(34, 197, 94, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 20px;
+  border-radius: 14px;
+  z-index: 12;
+  pointer-events: auto;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tutorial-banner.hidden {
+  opacity: 0;
+  transform: translate(-50%, -12px);
+  pointer-events: none;
+}
+
+.tutorial-badge-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tutorial-badge {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #052e16;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-align: center;
+}
+
+#tutorial-step-num {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: #86efac;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tutorial-content {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f8fafc;
+  max-width: 480px;
+}
+
+.btn-skip {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-skip:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* BACKPACK SECTION HEADERS */
+.backpack-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #86efac;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}

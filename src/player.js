@@ -81,13 +81,19 @@ export class Player {
     this.raycaster = new THREE.Raycaster();
     this.raycaster.far = 4.0;
     this.hoveredInteractable = null;
+    this.farmingManager = null;
 
-    // BACKPACK INVENTORY
+    // BACKPACK INVENTORY WITH EXPANDED FARMING CROPS & STARTER SEEDS
     this.backpack = [
       { id: 'apple', name: 'Fresh Apple', icon: '🍎', count: 0, description: 'Sweet apple harvested from orchard trees.' },
       { id: 'carrot', name: 'Farm Carrot', icon: '🥕', count: 0, description: 'Crisp organic carrot pulled from the soil.' },
+      { id: 'wheat', name: 'Golden Wheat', icon: '🌾', count: 0, description: 'Sun-ripened wheat bundle from the field.' },
       { id: 'pumpkin', name: 'Country Pumpkin', icon: '🎃', count: 0, description: 'Hearty golden pumpkin from the patch.' },
-      { id: 'wheat', name: 'Golden Wheat', icon: '🌾', count: 0, description: 'Sun-ripened wheat bundle from the field.' }
+      { id: 'tomato', name: 'Juicy Tomato', icon: '🍅', count: 0, description: 'Sweet garden tomato picked from the vine.' },
+      { id: 'seed_carrot', name: 'Carrot Seeds', icon: '🌱', count: 6, description: 'Plant into tilled soil to grow sweet carrots.' },
+      { id: 'seed_wheat', name: 'Wheat Seeds', icon: '🌱', count: 6, description: 'Plant into tilled soil to grow golden wheat.' },
+      { id: 'seed_pumpkin', name: 'Pumpkin Seeds', icon: '🌱', count: 4, description: 'Plant into tilled soil to grow country pumpkins.' },
+      { id: 'seed_tomato', name: 'Tomato Seeds', icon: '🌱', count: 4, description: 'Plant into tilled soil to grow regrowing tomatoes.' }
     ];
 
     // Pure first-person camera mode: no body/hat/backpack mesh in camera view
@@ -96,17 +102,40 @@ export class Player {
     this.setupInputs();
   }
 
-  addToBackpack(itemId, amount = 1) {
+  getItemCount(itemId) {
     const item = this.backpack.find(i => i.id === itemId);
-    if (item) {
-      item.count += amount;
+    return item ? item.count : 0;
+  }
+
+  removeFromBackpack(itemId, amount = 1) {
+    const item = this.backpack.find(i => i.id === itemId);
+    if (item && item.count >= amount) {
+      item.count -= amount;
       const evt = new CustomEvent('backpack:update', {
-        detail: { backpack: this.backpack, added: item }
+        detail: { backpack: this.backpack, removed: item }
       });
       window.dispatchEvent(evt);
       return true;
     }
     return false;
+  }
+
+  hasItem(itemId, amount = 1) {
+    return this.getItemCount(itemId) >= amount;
+  }
+
+  addToBackpack(itemId, amount = 1) {
+    let item = this.backpack.find(i => i.id === itemId);
+    if (!item) {
+      item = { id: itemId, name: itemId, icon: '📦', count: 0, description: '' };
+      this.backpack.push(item);
+    }
+    item.count += amount;
+    const evt = new CustomEvent('backpack:update', {
+      detail: { backpack: this.backpack, added: item }
+    });
+    window.dispatchEvent(evt);
+    return true;
   }
 
   restoreState(savedPlayer) {
@@ -123,6 +152,14 @@ export class Player {
         const item = this.backpack.find(i => i.id === savedItem.id);
         if (item) {
           item.count = savedItem.count;
+        } else {
+          this.backpack.push({
+            id: savedItem.id,
+            name: savedItem.id,
+            icon: '📦',
+            count: savedItem.count,
+            description: ''
+          });
         }
       });
       const evt = new CustomEvent('backpack:update', {
@@ -190,6 +227,55 @@ export class Player {
       case 'KeyE':
         this.triggerInteraction();
         break;
+      case 'Digit1':
+        if (this.farmingManager) {
+          this.farmingManager.activeToolIndex = 0;
+          const evt = new CustomEvent('tool:change', { detail: { toolIndex: 0 } });
+          window.dispatchEvent(evt);
+          if (this.farmingManager.tutorial.step === 1) {
+            this.farmingManager.advanceTutorial(2);
+          }
+        }
+        break;
+      case 'Digit2':
+        if (this.farmingManager) {
+          this.farmingManager.activeToolIndex = 1;
+          const evt = new CustomEvent('tool:change', { detail: { toolIndex: 1 } });
+          window.dispatchEvent(evt);
+          if (this.farmingManager.tutorial.step === 5) {
+            this.farmingManager.advanceTutorial(6);
+          }
+        }
+        break;
+      case 'Digit3':
+        if (this.farmingManager) {
+          this.farmingManager.activeToolIndex = 2;
+          const evt = new CustomEvent('tool:change', { detail: { toolIndex: 2 } });
+          window.dispatchEvent(evt);
+          if (this.farmingManager.tutorial.step === 3) {
+            this.farmingManager.advanceTutorial(4);
+          }
+        }
+        break;
+      case 'Digit4':
+        if (this.farmingManager) {
+          this.farmingManager.activeToolIndex = 3;
+          const evt = new CustomEvent('tool:change', { detail: { toolIndex: 3 } });
+          window.dispatchEvent(evt);
+        }
+        break;
+      case 'KeyQ':
+      case 'KeyR':
+        if (this.farmingManager) {
+          const cropOrder = ['carrot', 'wheat', 'pumpkin', 'tomato'];
+          const currIdx = cropOrder.indexOf(this.farmingManager.selectedCropId);
+          const dir = e.code === 'KeyQ' ? -1 : 1;
+          const nextIdx = (currIdx + dir + cropOrder.length) % cropOrder.length;
+          this.farmingManager.selectedCropId = cropOrder[nextIdx];
+          const evt = new CustomEvent('crop:change', { detail: { cropId: this.farmingManager.selectedCropId } });
+          window.dispatchEvent(evt);
+        }
+        break;
       case 'KeyB':
       case 'Tab':
         // Toggle backpack inventory modal
@@ -250,6 +336,11 @@ export class Player {
     if (document.pointerLockElement !== document.body) return;
 
     if (e.button === 0) {
+      // Prioritize farming tool action if aiming at a valid farming grid position
+      if (this.farmingManager && this.farmingManager.targetedTile && this.farmingManager.targetedTile.actionType !== 'none') {
+        const used = this.farmingManager.useActiveTool(this);
+        if (used) return;
+      }
       this.triggerInteraction();
     } else if (e.button === 2) {
       this.keys.zoom = true;
@@ -263,6 +354,16 @@ export class Player {
   }
 
   triggerInteraction() {
+    // 1. If targeting ripe farming crop, harvest with E
+    if (this.farmingManager && this.farmingManager.targetedTile) {
+      const tile = this.farmingManager.targetedTile.existingTile;
+      if (tile && tile.crop && tile.crop.stage === 4) {
+        this.farmingManager.harvestCrop(tile, this);
+        return;
+      }
+    }
+
+    // 2. Otherwise trigger hovered environmental interactable (well, tree, etc.)
     if (this.hoveredInteractable && this.hoveredInteractable.ready !== false) {
       this.hoveredInteractable.interact(this);
     }

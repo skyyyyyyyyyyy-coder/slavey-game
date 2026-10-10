@@ -148,6 +148,55 @@ export class ParticleManager {
     });
   }
 
+  // Farming action emitters
+  emitDirtPuff(origin) {
+    this.emit({
+      origin,
+      count: 24,
+      color: new THREE.Color(0.48, 0.30, 0.16),
+      speed: 2.4,
+      size: 0.28,
+      life: 0.45,
+      upwardBias: 1.4
+    });
+  }
+
+  emitWaterSplash(origin) {
+    this.emit({
+      origin,
+      count: 26,
+      color: new THREE.Color(0.24, 0.65, 1.0),
+      speed: 2.8,
+      size: 0.24,
+      life: 0.5,
+      upwardBias: 2.2
+    });
+  }
+
+  emitSeedPlant(origin) {
+    this.emit({
+      origin,
+      count: 16,
+      color: new THREE.Color(0.52, 0.82, 0.32),
+      speed: 1.8,
+      size: 0.22,
+      life: 0.4,
+      upwardBias: 1.1
+    });
+  }
+
+  emitHarvestPop(origin) {
+    this.emit({
+      origin,
+      count: 36,
+      color: new THREE.Color(1.0, 0.86, 0.24),
+      speed: 4.2,
+      size: 0.34,
+      life: 0.65,
+      upwardBias: 3.2
+    });
+  }
+
   update(dt) {
     const posAttr = this.points.geometry.attributes.position;
     const colAttr = this.points.geometry.attributes.color;

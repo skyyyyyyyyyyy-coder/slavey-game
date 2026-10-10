@@ -37,11 +37,20 @@
       </div>
 
       <div class="controls-hint hud-panel">
-        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk &bull; <kbd>SHIFT</kbd> Jog</div>
-        <div><kbd>SPACE</kbd> Jump &bull; <kbd>C</kbd> Crouch</div>
-        <div><kbd>E</kbd> Pick Fruits & Harvest Crops</div>
-        <div><kbd>B</kbd> / <kbd>TAB</kbd> Backpack &bull; <kbd>ESC</kbd> Settings</div>
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk &bull; <kbd>SHIFT</kbd> Jog &bull; <kbd>SPACE</kbd> Jump</div>
+        <div><kbd>1</kbd>-<kbd>4</kbd> Tools &bull; <kbd>LMB</kbd> Use Tool &bull; <kbd>Q</kbd>/<kbd>R</kbd> Cycle Seed</div>
+        <div><kbd>E</kbd> Pick / Harvest / Refill &bull; <kbd>B</kbd>/<kbd>TAB</kbd> Backpack</div>
       </div>
+    </div>
+
+    <!-- FARMING TUTORIAL BANNER -->
+    <div id="tutorial-panel" class="tutorial-banner">
+      <div class="tutorial-badge-row">
+        <span class="tutorial-badge">FARMING GUIDE</span>
+        <span id="tutorial-step-num">Step 1 of 7</span>
+      </div>
+      <div id="tutorial-text" class="tutorial-content">Equip your Field Hoe [Press 1]</div>
+      <button id="btn-skip-tutorial" class="btn-skip" title="Skip farming tutorial">Skip Tutorial ⏩</button>
     </div>
 
     <!-- Toast Notifications -->
@@ -59,9 +68,36 @@
         </div>
       </div>
 
+      <!-- FARMING TOOLS HOTBAR -->
+      <div class="tools-hotbar hud-panel" id="tools-hotbar">
+        <div class="hotbar-title">🛠️ Tools:</div>
+        <div class="tool-slot active" id="tool-hoe" data-tool="0" title="Field Hoe [1] - Till grass into farmland (8 Stamina)">
+          <span class="slot-key">1</span>
+          <span class="slot-icon">⛏️</span>
+          <span class="slot-name">Hoe</span>
+        </div>
+        <div class="tool-slot" id="tool-water" data-tool="1" title="Watering Can [2] - Water crops (4 Stamina, Refill at Well [E])">
+          <span class="slot-key">2</span>
+          <span class="slot-icon">💧</span>
+          <span class="slot-name">Can</span>
+          <span class="water-badge" id="water-badge">12/12</span>
+        </div>
+        <div class="tool-slot" id="tool-seeds" data-tool="2" title="Seed Pouch [3] - Plant seeds (2 Stamina, [Q/R] Cycle)">
+          <span class="slot-key">3</span>
+          <span class="slot-icon">🌱</span>
+          <span class="slot-name" id="seed-slot-name">Carrot</span>
+          <span class="seed-badge" id="seed-badge">6</span>
+        </div>
+        <div class="tool-slot" id="tool-sickle" data-tool="3" title="Harvest Sickle [4] - Clear crops or tiles (5 Stamina)">
+          <span class="slot-key">4</span>
+          <span class="slot-icon">🌾</span>
+          <span class="slot-name">Sickle</span>
+        </div>
+      </div>
+
       <!-- Quick Backpack Hotbar -->
       <div class="backpack-hotbar" id="hotbar-backpack" title="Press B or Tab to open full Backpack">
-        <div class="hotbar-title">🎒 Backpack:</div>
+        <div class="hotbar-title">🎒 Produce:</div>
         <div class="item-slot" id="slot-apple">
           <span>🍎</span>
           <span class="item-count" id="count-apple">0</span>
@@ -70,13 +106,17 @@
           <span>🥕</span>
           <span class="item-count" id="count-carrot">0</span>
         </div>
+        <div class="item-slot" id="slot-wheat">
+          <span>🌾</span>
+          <span class="item-count" id="count-wheat">0</span>
+        </div>
         <div class="item-slot" id="slot-pumpkin">
           <span>🎃</span>
           <span class="item-count" id="count-pumpkin">0</span>
         </div>
-        <div class="item-slot" id="slot-wheat">
-          <span>🌾</span>
-          <span class="item-count" id="count-wheat">0</span>
+        <div class="item-slot" id="slot-tomato">
+          <span>🍅</span>
+          <span class="item-count" id="count-tomato">0</span>
         </div>
       </div>
 
@@ -90,9 +130,10 @@
   <!-- FULL BACKPACK INVENTORY MODAL -->
   <div id="backpack-modal" class="hidden">
     <div class="backpack-dialog">
-      <h2>🎒 Farm Backpack</h2>
-      <p style="color: #94a3b8; font-size: 13px;">Items harvested from the farm fields and fruit orchard.</p>
+      <h2>🎒 Farm Backpack & Inventory</h2>
+      <p style="color: #94a3b8; font-size: 13px;">Harvested agricultural produce and planting seeds.</p>
       
+      <div class="backpack-section-title">HARVESTED CROPS & FRUIT</div>
       <div class="backpack-grid">
         <div class="backpack-card">
           <div class="backpack-card-icon">🍎</div>
@@ -113,6 +154,15 @@
         </div>
 
         <div class="backpack-card">
+          <div class="backpack-card-icon">🌾</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Golden Wheat</div>
+            <div class="backpack-card-desc">Sun-ripened wheat bundle from the field.</div>
+            <div class="backpack-card-count" id="modal-wheat-count">Count: 0</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
           <div class="backpack-card-icon">🎃</div>
           <div class="backpack-card-info">
             <div class="backpack-card-name">Country Pumpkin</div>
@@ -122,16 +172,55 @@
         </div>
 
         <div class="backpack-card">
-          <div class="backpack-card-icon">🌾</div>
+          <div class="backpack-card-icon">🍅</div>
           <div class="backpack-card-info">
-            <div class="backpack-card-name">Golden Wheat</div>
-            <div class="backpack-card-desc">Sun-ripened wheat bundle.</div>
-            <div class="backpack-card-count" id="modal-wheat-count">Count: 0</div>
+            <div class="backpack-card-name">Juicy Tomato</div>
+            <div class="backpack-card-desc">Sweet vine-ripened garden tomato.</div>
+            <div class="backpack-card-count" id="modal-tomato-count">Count: 0</div>
           </div>
         </div>
       </div>
 
-      <button id="btn-close-backpack" class="btn-primary" style="margin-top: 10px;">CLOSE BACKPACK (B / TAB)</button>
+      <div class="backpack-section-title" style="margin-top: 14px;">SEED SACKS</div>
+      <div class="backpack-grid">
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🌱</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Carrot Seeds</div>
+            <div class="backpack-card-desc">Takes 2 days to grow into sweet carrots.</div>
+            <div class="backpack-card-count" id="modal-seed-carrot-count">Count: 6</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🌱</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Wheat Seeds</div>
+            <div class="backpack-card-desc">Takes 3 days to grow into golden wheat.</div>
+            <div class="backpack-card-count" id="modal-seed-wheat-count">Count: 6</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🌱</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Pumpkin Seeds</div>
+            <div class="backpack-card-desc">Takes 4 days to grow into giant pumpkins.</div>
+            <div class="backpack-card-count" id="modal-seed-pumpkin-count">Count: 4</div>
+          </div>
+        </div>
+
+        <div class="backpack-card">
+          <div class="backpack-card-icon">🌱</div>
+          <div class="backpack-card-info">
+            <div class="backpack-card-name">Tomato Seeds</div>
+            <div class="backpack-card-desc">Takes 3 days to grow, regrows every 2 days!</div>
+            <div class="backpack-card-count" id="modal-seed-tomato-count">Count: 4</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-close-backpack" class="btn-primary" style="margin-top: 14px;">CLOSE BACKPACK (B / TAB)</button>
     </div>
   </div>
 

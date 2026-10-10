@@ -1817,6 +1817,20 @@ export class World {
       new THREE.Vector3(x + 1.5, 1.2, z + 1.5)
     );
     this.world.colliders.push({ box: wellBox, mesh: wellBase, type: 'solid' });
+
+    // Interactive Stone Well for refilling Watering Can
+    this.interactables.push({
+      id: 'stone_well',
+      mesh: wellBase,
+      name: 'Stone Well',
+      prompt: 'Refill Watering Can',
+      ready: true,
+      interact: (player) => {
+        if (player.farmingManager) {
+          player.farmingManager.refillWateringCan();
+        }
+      }
+    });
   }
 
   /**

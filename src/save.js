@@ -1,6 +1,6 @@
 import { events } from './events.js';
 
-export const CURRENT_SAVE_VERSION = 1;
+export const CURRENT_SAVE_VERSION = 2;
 export const SAVE_KEY = 'meadow_valley_save_v1';
 export const BACKUP_KEY = 'meadow_valley_save_corrupt_backup';
 
@@ -15,7 +15,7 @@ export class SaveManager {
     this.autoSaveTimer = 0;
     this.isAutoSaveEnabled = true;
 
-    this.gameStateProvider = null; // Callback returning { player, world, timeManager, settings }
+    this.gameStateProvider = null; // Callback returning { player, world, timeManager, farming, settings }
     this.lastSavedTimestamp = null;
 
     this.setupLifecycleHooks();
@@ -65,7 +65,7 @@ export class SaveManager {
    */
   createSavePayload() {
     if (!this.gameStateProvider) return null;
-    const { player, world, timeManager, settings } = this.gameStateProvider();
+    const { player, world, timeManager, farming, settings } = this.gameStateProvider();
 
     // 1. Player Data
     const playerData = {
@@ -115,14 +115,17 @@ export class SaveManager {
     // 3. Time Data
     const timeData = timeManager ? timeManager.serialize() : null;
 
-    // 4. Future Compatible Economy & Farm Progression
+    // 4. Interactive Farming Grid & Tools State
+    const farmingData = farming ? farming.serialize() : null;
+
+    // 5. Future Compatible Economy & Farm Progression
     const economyData = {
       gold: 150,
       farmLevel: 1,
       totalHarvests: 0
     };
 
-    // 5. Settings Data
+    // 6. Settings Data
     const settingsData = settings || {
       mouseSensitivity: player.mouseSensitivity,
       headBobEnabled: player.headBobEnabled,
@@ -138,6 +141,7 @@ export class SaveManager {
         crops: cropsState,
         fruits: fruitsState
       },
+      farming: farmingData,
       time: timeData,
       economy: economyData,
       settings: settingsData
@@ -220,12 +224,47 @@ export class SaveManager {
       current.schemaVersion = 1;
     }
 
-    // Future version migrations can be chained here:
-    // if (current.schemaVersion === 1 && CURRENT_SAVE_VERSION > 1) {
-    //   current = migrateV1ToV2(current);
-    // }
+    if (current.schemaVersion === 1 && CURRENT_SAVE_VERSION >= 2) {
+      current = this.migrateV1ToV2(current);
+    }
 
     return current;
+  }
+
+  migrateV1ToV2(data) {
+    const upgraded = { ...data };
+    upgraded.schemaVersion = 2;
+
+    // Initialize default farming state if absent
+    if (!upgraded.farming) {
+      upgraded.farming = {
+        tiles: [],
+        tools: {
+          activeToolIndex: 0,
+          selectedCropId: 'carrot',
+          wateringCan: { current: 12, max: 12 }
+        },
+        tutorial: { step: 1, completed: false, skipped: false }
+      };
+    }
+
+    // Ensure player backpack contains starter seeds and produce slots
+    if (upgraded.player && Array.isArray(upgraded.player.backpack)) {
+      const defaultItems = [
+        { id: 'tomato', count: 0 },
+        { id: 'seed_carrot', count: 6 },
+        { id: 'seed_wheat', count: 6 },
+        { id: 'seed_pumpkin', count: 4 },
+        { id: 'seed_tomato', count: 4 }
+      ];
+      defaultItems.forEach(item => {
+        if (!upgraded.player.backpack.find(b => b.id === item.id)) {
+          upgraded.player.backpack.push({ id: item.id, count: item.count });
+        }
+      });
+    }
+
+    return upgraded;
   }
 
   /**

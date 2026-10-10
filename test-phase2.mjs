@@ -211,7 +211,7 @@ try {
 
         // Load Save Data
         const loaded = sm.load();
-        assert('SaveManager.load() Returns Valid Object', !!loaded && loaded.schemaVersion === 1);
+        assert('SaveManager.load() Returns Valid Object', !!loaded && (loaded.schemaVersion === 1 || loaded.schemaVersion === 2));
 
         // Restore onto game
         p.restoreState(loaded.player);

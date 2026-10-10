@@ -8,6 +8,7 @@ import { TimeManager } from './time.js';
 import { DayNightCycle } from './daynight.js';
 import { saveManager } from './save.js';
 import { events } from './events.js';
+import { FarmingManager, CROPS, TOOLS } from './farming.js';
 
 // 1. Scene, Camera, Renderer Setup
 const container = document.getElementById('canvas-container');
@@ -33,12 +34,20 @@ const player = new Player(camera, collisionWorld, particleManager, scene);
 const world = new World(scene, collisionWorld, particleManager);
 const timeManager = new TimeManager();
 const dayNightCycle = new DayNightCycle(scene, timeManager, world, renderer);
+const farmingManager = new FarmingManager(scene, collisionWorld, particleManager, timeManager);
+
+// Connect farming manager to player & world interactables
+player.farmingManager = farmingManager;
+if (farmingManager.seedSupplyInteractable) {
+  world.interactables.push(farmingManager.seedSupplyInteractable);
+}
 
 // Wire save state provider
 saveManager.registerStateProvider(() => ({
   player,
   world,
   timeManager,
+  farming: farmingManager,
   settings: {
     mouseSensitivity: player.mouseSensitivity,
     headBobEnabled: player.headBobEnabled,
@@ -54,6 +63,9 @@ window.player = player;
 window.world = world;
 window.timeManager = timeManager;
 window.dayNightCycle = dayNightCycle;
+window.farmingManager = farmingManager;
+window.CROPS = CROPS;
+window.TOOLS = TOOLS;
 window.saveManager = saveManager;
 window.events = events;
 
@@ -92,10 +104,34 @@ const countApple = document.getElementById('count-apple');
 const countCarrot = document.getElementById('count-carrot');
 const countPumpkin = document.getElementById('count-pumpkin');
 const countWheat = document.getElementById('count-wheat');
+const countTomato = document.getElementById('count-tomato');
+
 const modalAppleCount = document.getElementById('modal-apple-count');
 const modalCarrotCount = document.getElementById('modal-carrot-count');
 const modalPumpkinCount = document.getElementById('modal-pumpkin-count');
 const modalWheatCount = document.getElementById('modal-wheat-count');
+const modalTomatoCount = document.getElementById('modal-tomato-count');
+
+const modalSeedCarrotCount = document.getElementById('modal-seed-carrot-count');
+const modalSeedWheatCount = document.getElementById('modal-seed-wheat-count');
+const modalSeedPumpkinCount = document.getElementById('modal-seed-pumpkin-count');
+const modalSeedTomatoCount = document.getElementById('modal-seed-tomato-count');
+
+// Farming Tool Hotbar Slots & Badges
+const toolHoe = document.getElementById('tool-hoe');
+const toolWater = document.getElementById('tool-water');
+const toolSeeds = document.getElementById('tool-seeds');
+const toolSickle = document.getElementById('tool-sickle');
+const toolSlots = [toolHoe, toolWater, toolSeeds, toolSickle];
+const waterBadge = document.getElementById('water-badge');
+const seedSlotName = document.getElementById('seed-slot-name');
+const seedBadge = document.getElementById('seed-badge');
+
+// Tutorial Banner Elements
+const tutorialPanel = document.getElementById('tutorial-panel');
+const tutorialStepNum = document.getElementById('tutorial-step-num');
+const tutorialText = document.getElementById('tutorial-text');
+const btnSkipTutorial = document.getElementById('btn-skip-tutorial');
 
 const sliderSens = document.getElementById('slider-sens');
 const sensVal = document.getElementById('sens-val');
@@ -136,27 +172,134 @@ events.on('time:tick', (snapshot) => {
   if (timeDate) timeDate.textContent = snapshot.formattedDate;
 });
 
-// 6. Backpack Inventory UI Updates
+// 6. Tool Hotbar & Tutorial HUD Systems
+function updateToolHotbarUI() {
+  toolSlots.forEach((slot, idx) => {
+    if (slot) {
+      slot.classList.toggle('active', farmingManager.activeToolIndex === idx);
+    }
+  });
+
+  if (waterBadge) {
+    waterBadge.textContent = `${farmingManager.wateringCanCurrent}/${farmingManager.wateringCanMax}`;
+    waterBadge.style.opacity = farmingManager.wateringCanCurrent === 0 ? '0.6' : '1';
+  }
+
+  const crop = CROPS[farmingManager.selectedCropId];
+  if (crop) {
+    if (seedSlotName) seedSlotName.textContent = crop.name;
+    if (seedBadge) {
+      const count = player.getItemCount(crop.seedId);
+      seedBadge.textContent = count;
+      seedBadge.style.opacity = count === 0 ? '0.6' : '1';
+    }
+  }
+}
+
+const TUTORIAL_STEPS = {
+  1: "Equip your Field Hoe [Press 1]",
+  2: "Till a grass tile into farmland with Left Mouse Button [LMB]",
+  3: "Equip your Seed Pouch [Press 3] and choose seeds [Q / R]",
+  4: "Plant seeds into tilled soil with Left Mouse Button [LMB]",
+  5: "Equip your Watering Can [Press 2]",
+  6: "Water the planted tile with Left Mouse Button [LMB] (Refill at Well [E] if empty)",
+  7: "Wait for sunrise or advance day, then harvest ripe crops with [E]!"
+};
+
+function updateTutorialUI(tutorial) {
+  if (!tutorialPanel) return;
+  if (tutorial.completed) {
+    tutorialStepNum.textContent = 'DONE';
+    tutorialText.textContent = '🎉 Tutorial Complete! Happy farming!';
+    setTimeout(() => {
+      tutorialPanel.classList.add('hidden');
+    }, 4000);
+    return;
+  }
+  if (tutorial.skipped) {
+    tutorialPanel.classList.add('hidden');
+    return;
+  }
+  tutorialPanel.classList.remove('hidden');
+  tutorialStepNum.textContent = `Step ${tutorial.step} of 7`;
+  tutorialText.textContent = TUTORIAL_STEPS[tutorial.step] || '';
+}
+
+window.addEventListener('tutorial:update', (e) => {
+  updateTutorialUI(e.detail);
+});
+
+if (btnSkipTutorial) {
+  btnSkipTutorial.addEventListener('click', () => {
+    farmingManager.skipTutorial();
+    showToast('Farming tutorial skipped');
+  });
+}
+
+window.addEventListener('tool:change', () => updateToolHotbarUI());
+window.addEventListener('crop:change', () => updateToolHotbarUI());
+events.on('farming:watered', () => updateToolHotbarUI());
+events.on('farming:refilled', () => updateToolHotbarUI());
+events.on('farming:planted', () => updateToolHotbarUI());
+
+// Interactive clicking on tool slots in HUD
+toolSlots.forEach((slot, idx) => {
+  if (slot) {
+    slot.addEventListener('click', () => {
+      farmingManager.activeToolIndex = idx;
+      updateToolHotbarUI();
+      if (idx === 0 && farmingManager.tutorial.step === 1) farmingManager.advanceTutorial(2);
+      if (idx === 2 && farmingManager.tutorial.step === 3) farmingManager.advanceTutorial(4);
+      if (idx === 1 && farmingManager.tutorial.step === 5) farmingManager.advanceTutorial(6);
+    });
+  }
+});
+
+// Click seed slot to cycle seeds
+if (toolSeeds) {
+  toolSeeds.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const cropOrder = ['carrot', 'wheat', 'pumpkin', 'tomato'];
+    const currIdx = cropOrder.indexOf(farmingManager.selectedCropId);
+    farmingManager.selectedCropId = cropOrder[(currIdx + 1) % cropOrder.length];
+    updateToolHotbarUI();
+  });
+}
+
+// 7. Backpack Inventory UI Updates
 function updateBackpackUI(backpack) {
   backpack.forEach((item) => {
     if (item.id === 'apple') {
-      countApple.textContent = item.count;
-      modalAppleCount.textContent = `Count: ${item.count}`;
-      document.getElementById('slot-apple').classList.toggle('has-item', item.count > 0);
+      if (countApple) countApple.textContent = item.count;
+      if (modalAppleCount) modalAppleCount.textContent = `Count: ${item.count}`;
+      document.getElementById('slot-apple')?.classList.toggle('has-item', item.count > 0);
     } else if (item.id === 'carrot') {
-      countCarrot.textContent = item.count;
-      modalCarrotCount.textContent = `Count: ${item.count}`;
-      document.getElementById('slot-carrot').classList.toggle('has-item', item.count > 0);
-    } else if (item.id === 'pumpkin') {
-      countPumpkin.textContent = item.count;
-      modalPumpkinCount.textContent = `Count: ${item.count}`;
-      document.getElementById('slot-pumpkin').classList.toggle('has-item', item.count > 0);
+      if (countCarrot) countCarrot.textContent = item.count;
+      if (modalCarrotCount) modalCarrotCount.textContent = `Count: ${item.count}`;
+      document.getElementById('slot-carrot')?.classList.toggle('has-item', item.count > 0);
     } else if (item.id === 'wheat') {
-      countWheat.textContent = item.count;
-      modalWheatCount.textContent = `Count: ${item.count}`;
-      document.getElementById('slot-wheat').classList.toggle('has-item', item.count > 0);
+      if (countWheat) countWheat.textContent = item.count;
+      if (modalWheatCount) modalWheatCount.textContent = `Count: ${item.count}`;
+      document.getElementById('slot-wheat')?.classList.toggle('has-item', item.count > 0);
+    } else if (item.id === 'pumpkin') {
+      if (countPumpkin) countPumpkin.textContent = item.count;
+      if (modalPumpkinCount) modalPumpkinCount.textContent = `Count: ${item.count}`;
+      document.getElementById('slot-pumpkin')?.classList.toggle('has-item', item.count > 0);
+    } else if (item.id === 'tomato') {
+      if (countTomato) countTomato.textContent = item.count;
+      if (modalTomatoCount) modalTomatoCount.textContent = `Count: ${item.count}`;
+      document.getElementById('slot-tomato')?.classList.toggle('has-item', item.count > 0);
+    } else if (item.id === 'seed_carrot') {
+      if (modalSeedCarrotCount) modalSeedCarrotCount.textContent = `Count: ${item.count}`;
+    } else if (item.id === 'seed_wheat') {
+      if (modalSeedWheatCount) modalSeedWheatCount.textContent = `Count: ${item.count}`;
+    } else if (item.id === 'seed_pumpkin') {
+      if (modalSeedPumpkinCount) modalSeedPumpkinCount.textContent = `Count: ${item.count}`;
+    } else if (item.id === 'seed_tomato') {
+      if (modalSeedTomatoCount) modalSeedTomatoCount.textContent = `Count: ${item.count}`;
     }
   });
+  updateToolHotbarUI();
 }
 
 window.addEventListener('backpack:update', (e) => {
@@ -178,11 +321,12 @@ window.addEventListener('backpack:toggle', toggleBackpackModal);
 hotbarBackpack.addEventListener('click', toggleBackpackModal);
 btnCloseBackpack.addEventListener('click', toggleBackpackModal);
 
-// 7. Save / Load & Menu Management
+// 8. Save / Load & Menu Management
 function applySaveData(saveData) {
   if (!saveData) return false;
   if (saveData.player) player.restoreState(saveData.player);
   if (saveData.world) world.restoreCropsAndFruits(saveData.world.crops, saveData.world.fruits);
+  if (saveData.farming) farmingManager.restoreState(saveData.farming);
   if (saveData.time) timeManager.deserialize(saveData.time);
   if (saveData.settings) {
     if (typeof saveData.settings.mouseSensitivity === 'number') {
@@ -199,6 +343,10 @@ function applySaveData(saveData) {
       toggleInvert.checked = player.invertY;
     }
   }
+
+  updateBackpackUI(player.backpack);
+  updateToolHotbarUI();
+  updateTutorialUI(farmingManager.tutorial);
   return true;
 }
 
@@ -223,9 +371,23 @@ function lockPointer() {
 function startNewGame() {
   player.respawn(new THREE.Vector3(0, 1.2, 0));
   timeManager.setTime(8, 0); // 08:00 AM Spring 1
+
+  // Clean farming state
+  farmingManager.tiles.forEach(tile => farmingManager.farmingGroup.remove(tile.soilGroup));
+  farmingManager.tiles.clear();
+  farmingManager.activeToolIndex = 0;
+  farmingManager.selectedCropId = 'carrot';
+  farmingManager.wateringCanCurrent = 12;
+  farmingManager.tutorial = { step: 1, completed: false, skipped: false };
+
   isGameStarted = true;
   startOverlay.classList.add('hidden');
   lockPointer();
+
+  updateBackpackUI(player.backpack);
+  updateToolHotbarUI();
+  updateTutorialUI(farmingManager.tutorial);
+
   saveManager.save('new_game_start');
   showToast('Welcome to your Meadow Valley Farm 🌾');
 }
@@ -400,8 +562,15 @@ function animate() {
   world.update(dt, totalTime);
   particleManager.update(dt);
 
+  // Update Farming Grid Targeting
+  farmingManager.updateTargeting(player);
+
   // Update Reticle & Interaction Prompt
-  if (player.hoveredInteractable && player.hoveredInteractable.ready !== false) {
+  if (farmingManager.targetedTile && farmingManager.targetedTile.promptText) {
+    reticle.classList.add('hover');
+    interactPrompt.classList.remove('hidden');
+    interactText.textContent = farmingManager.targetedTile.promptText;
+  } else if (player.hoveredInteractable && player.hoveredInteractable.ready !== false) {
     reticle.classList.add('hover');
     interactPrompt.classList.remove('hidden');
     interactText.textContent = `${player.hoveredInteractable.prompt} [${player.hoveredInteractable.name}]`;
