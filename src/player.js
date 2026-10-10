@@ -547,7 +547,7 @@ export class Player {
     if (this.keys.right) targetRoll -= 0.012;
     this.cameraRoll += (targetRoll - this.cameraRoll) * Math.min(1.0, 10.0 * dt);
 
-    // 10. Dynamic FOV
+    // 10. Dynamic FOV & Interior Far Plane Occlusion Culling
     let targetFov = this.baseFov;
     if (this.keys.zoom) {
       targetFov = 50;
@@ -555,8 +555,20 @@ export class Player {
       targetFov = 80;
     }
     this.currentFov += (targetFov - this.currentFov) * Math.min(1.0, 8.0 * dt);
+
+    const isInsideHouse = Math.abs(this.position.x - 160) < 25 && Math.abs(this.position.z - 160) < 25;
+    const targetFar = isInsideHouse ? 30 : 600;
+
+    let needsProjUpdate = false;
     if (Math.abs(this.camera.fov - this.currentFov) > 0.01) {
       this.camera.fov = this.currentFov;
+      needsProjUpdate = true;
+    }
+    if (this.camera.far !== targetFar) {
+      this.camera.far = targetFar;
+      needsProjUpdate = true;
+    }
+    if (needsProjUpdate) {
       this.camera.updateProjectionMatrix();
     }
 

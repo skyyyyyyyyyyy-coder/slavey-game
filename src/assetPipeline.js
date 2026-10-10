@@ -55,8 +55,9 @@ export class AssetPipeline {
                   child.castShadow = castShadow;
                   child.receiveShadow = receiveShadow;
 
-                  // Detect dedicated collision mesh (e.g. named *_col or *_collider)
-                  if (child.name.toLowerCase().includes('_col') || child.name.toLowerCase().includes('collider')) {
+                  // Detect dedicated collision mesh (e.g. named *-col, *_col or *collider*)
+                  const lowerName = child.name.toLowerCase();
+                  if (lowerName.includes('-col') || lowerName.includes('_col') || lowerName.includes('collider')) {
                     child.visible = false;
                     child.userData.isColliderMesh = true;
                   }
@@ -138,6 +139,7 @@ export class AssetPipeline {
    * Generates or extracts collision proxies from the loaded hierarchy
    */
   extractColliders(object, defaultType = 'box') {
+    object.updateMatrixWorld(true);
     const colliders = [];
 
     // Check for explicit collider children first

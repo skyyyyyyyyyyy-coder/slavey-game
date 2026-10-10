@@ -36,6 +36,7 @@ const world = new World(scene, collisionWorld, particleManager);
 const timeManager = new TimeManager();
 const dayNightCycle = new DayNightCycle(scene, timeManager, world, renderer);
 const farmingManager = new FarmingManager(scene, collisionWorld, particleManager, timeManager);
+world.timeManager = timeManager;
 
 window.assetPipeline = assetPipeline;
 
@@ -62,6 +63,7 @@ saveManager.registerStateProvider(() => ({
 player.respawn(new THREE.Vector3(0, 1.2, 0));
 
 // Expose globals for inspection, testing, and debugging
+window.THREE = THREE;
 window.player = player;
 window.world = world;
 window.renderer = renderer;
@@ -91,6 +93,11 @@ const btnConfirmCancel = document.getElementById('btn-confirm-cancel');
 const btnConfirmOverwrite = document.getElementById('btn-confirm-overwrite');
 const btnCloseBackpack = document.getElementById('btn-close-backpack');
 const hotbarBackpack = document.getElementById('hotbar-backpack');
+
+const storageModal = document.getElementById('storage-modal');
+const chestSlotsGrid = document.getElementById('chest-slots-grid');
+const backpackTransferGrid = document.getElementById('backpack-transfer-grid');
+const btnCloseStorage = document.getElementById('btn-close-storage');
 
 const timeIcon = document.getElementById('time-icon');
 const timeClock = document.getElementById('time-clock');
@@ -326,11 +333,140 @@ window.addEventListener('backpack:toggle', toggleBackpackModal);
 hotbarBackpack.addEventListener('click', toggleBackpackModal);
 btnCloseBackpack.addEventListener('click', toggleBackpackModal);
 
+const ITEM_META = {
+  apple: { name: 'Fresh Apple', icon: '🍎' },
+  carrot: { name: 'Farm Carrot', icon: '🥕' },
+  wheat: { name: 'Golden Wheat', icon: '🌾' },
+  pumpkin: { name: 'Country Pumpkin', icon: '🎃' },
+  tomato: { name: 'Juicy Tomato', icon: '🍅' },
+  seed_carrot: { name: 'Carrot Seeds', icon: '🌱' },
+  seed_wheat: { name: 'Wheat Seeds', icon: '🌱' },
+  seed_pumpkin: { name: 'Pumpkin Seeds', icon: '🌱' },
+  seed_tomato: { name: 'Tomato Seeds', icon: '🌱' }
+};
+
+function renderStorageUI() {
+  if (!chestSlotsGrid || !backpackTransferGrid) return;
+  chestSlotsGrid.innerHTML = '';
+  backpackTransferGrid.innerHTML = '';
+
+  const chestItems = world.chestItems || [];
+
+  // 1. Render 16 Chest Slots
+  for (let i = 0; i < 16; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'chest-slot-cell';
+    const item = chestItems[i];
+
+    if (item && item.count > 0) {
+      slot.innerHTML = `
+        <span class="chest-slot-icon">${item.icon || '📦'}</span>
+        <span class="chest-slot-label">${item.name || item.id}</span>
+        <span class="chest-slot-count">${item.count}</span>
+      `;
+      slot.title = `${item.name || item.id} (${item.count})\nClick to withdraw 1, Shift-Click to withdraw all`;
+      slot.addEventListener('click', (e) => {
+        const transferCount = e.shiftKey ? item.count : 1;
+        item.count -= transferCount;
+        player.addToBackpack(item.id, transferCount);
+        if (item.count <= 0) {
+          chestItems.splice(i, 1);
+        }
+        sounds.playHarvest();
+        renderStorageUI();
+        updateBackpackUI(player.backpack);
+      });
+    } else {
+      slot.classList.add('empty');
+      slot.innerHTML = `<span style="opacity: 0.25; font-size: 16px;">+</span>`;
+    }
+    chestSlotsGrid.appendChild(slot);
+  }
+
+  // 2. Render Player Backpack Transfer Cards
+  player.backpack.forEach(bpItem => {
+    if (bpItem.count <= 0) return;
+    const meta = ITEM_META[bpItem.id] || { name: bpItem.name || bpItem.id, icon: bpItem.icon || '📦' };
+    const card = document.createElement('div');
+    card.className = 'backpack-transfer-card';
+    card.innerHTML = `
+      <div class="backpack-transfer-left">
+        <span class="backpack-transfer-icon">${meta.icon}</span>
+        <span class="backpack-transfer-name">${meta.name}</span>
+      </div>
+      <span class="backpack-transfer-count">${bpItem.count}</span>
+    `;
+    card.title = `Deposit into chest\nClick to deposit 1, Shift-Click to deposit all`;
+    card.addEventListener('click', (e) => {
+      let existingInChest = chestItems.find(it => it.id === bpItem.id);
+      if (!existingInChest && chestItems.length >= 16) {
+        showToast('Chest is full! Maximum 16 item slots.');
+        return;
+      }
+      const transferCount = e.shiftKey ? bpItem.count : 1;
+      player.removeFromBackpack(bpItem.id, transferCount);
+      if (existingInChest) {
+        existingInChest.count += transferCount;
+      } else {
+        chestItems.push({
+          id: bpItem.id,
+          name: meta.name,
+          icon: meta.icon,
+          count: transferCount
+        });
+      }
+      sounds.playHarvest();
+      renderStorageUI();
+      updateBackpackUI(player.backpack);
+    });
+    backpackTransferGrid.appendChild(card);
+  });
+}
+
+function openStorageModal() {
+  if (!storageModal) return;
+  renderStorageUI();
+  storageModal.classList.remove('hidden');
+  document.exitPointerLock();
+}
+
+function closeStorageModal() {
+  if (!storageModal) return;
+  storageModal.classList.add('hidden');
+  if (world.interiorChestLid) {
+    world.interiorChestLid.rotation.x = 0;
+  }
+  lockPointer();
+}
+
+window.addEventListener('storage:open', () => {
+  openStorageModal();
+});
+
+if (btnCloseStorage) {
+  btnCloseStorage.addEventListener('click', () => {
+    closeStorageModal();
+  });
+}
+
+window.addEventListener('keydown', (e) => {
+  if (storageModal && !storageModal.classList.contains('hidden')) {
+    if (e.code === 'KeyE' || e.code === 'Escape') {
+      closeStorageModal();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }
+});
+
 // 8. Save / Load & Menu Management
 function applySaveData(saveData) {
   if (!saveData) return false;
   if (saveData.player) player.restoreState(saveData.player);
-  if (saveData.world) world.restoreCropsAndFruits(saveData.world.crops, saveData.world.fruits);
+  if (saveData.world) {
+    world.restoreCropsAndFruits(saveData.world.crops, saveData.world.fruits);
+    if (saveData.world.house) world.restoreHouseState(saveData.world.house);
+  }
   if (saveData.farming) farmingManager.restoreState(saveData.farming);
   if (saveData.time) timeManager.deserialize(saveData.time);
   if (saveData.settings) {
@@ -455,9 +591,16 @@ document.addEventListener('pointerlockchange', () => {
     pauseOverlay.classList.add('hidden');
     backpackModal.classList.add('hidden');
     confirmModal.classList.add('hidden');
+    if (storageModal) {
+      storageModal.classList.add('hidden');
+      if (world.interiorChestLid) world.interiorChestLid.rotation.x = 0;
+    }
     timeManager.resume();
   } else {
-    if (isGameStarted && backpackModal.classList.contains('hidden') && confirmModal.classList.contains('hidden')) {
+    const isModalOpen = !backpackModal.classList.contains('hidden') ||
+                        !confirmModal.classList.contains('hidden') ||
+                        (storageModal && !storageModal.classList.contains('hidden'));
+    if (isGameStarted && !isModalOpen) {
       pauseOverlay.classList.remove('hidden');
       timeManager.pause();
     }

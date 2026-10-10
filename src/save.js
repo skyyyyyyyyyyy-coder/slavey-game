@@ -139,7 +139,11 @@ export class SaveManager {
       player: playerData,
       world: {
         crops: cropsState,
-        fruits: fruitsState
+        fruits: fruitsState,
+        house: {
+          fireLit: world.isFireLit !== undefined ? world.isFireLit : true,
+          chest: Array.isArray(world.chestItems) ? world.chestItems : []
+        }
       },
       farming: farmingData,
       time: timeData,
@@ -262,6 +266,23 @@ export class SaveManager {
           upgraded.player.backpack.push({ id: item.id, count: item.count });
         }
       });
+    }
+
+    // Ensure default world.house state if absent
+    if (!upgraded.world) {
+      upgraded.world = {};
+    }
+    if (!upgraded.world.house) {
+      upgraded.world.house = {
+        fireLit: true,
+        chest: [
+          { id: 'seed_carrot', name: 'Carrot Seeds', icon: '🌱', count: 4 },
+          { id: 'seed_wheat', name: 'Wheat Seeds', icon: '🌱', count: 4 },
+          { id: 'seed_pumpkin', name: 'Pumpkin Seeds', icon: '🌱', count: 2 },
+          { id: 'seed_tomato', name: 'Tomato Seeds', icon: '🌱', count: 2 },
+          { id: 'apple', name: 'Fresh Apple', icon: '🍎', count: 3 }
+        ]
+      };
     }
 
     return upgraded;

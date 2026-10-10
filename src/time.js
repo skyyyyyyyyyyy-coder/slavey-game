@@ -149,6 +149,12 @@ export class TimeManager {
       year: this.year
     });
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('time:dayRollover', {
+        detail: { day: this.day, season: this.season, year: this.year }
+      }));
+    }
+
     if (seasonRollover) {
       events.emit('time:season_changed', {
         season: this.season,
@@ -161,6 +167,27 @@ export class TimeManager {
         year: this.year
       });
     }
+  }
+
+  /**
+   * Safely advances time to morning (default 06:00 AM) of the next day.
+   * Atomically triggers advanceDay and updates clock.
+   */
+  sleepUntilMorning(targetHour = 6) {
+    this.advanceDay();
+    this.hour = targetHour;
+    this.minute = 0;
+    this.second = 0;
+    this.totalInGameSeconds = this.calculateTotalSeconds();
+    this.lastEmittedMinute = -1;
+    this.lastEmittedHour = targetHour;
+    events.emit('time:tick', this.getSnapshot());
+    events.emit('time:hour_changed', {
+      hour: this.hour,
+      day: this.day,
+      season: this.season,
+      year: this.year
+    });
   }
 
   pause() {

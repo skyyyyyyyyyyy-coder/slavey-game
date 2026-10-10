@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { sounds } from './audio.js';
 import { events } from './events.js';
+import { assetPipeline } from './assetPipeline.js';
 
 /**
  * Procedural lush alpine grass texture with natural dapples and meadow blossoms
@@ -668,337 +669,66 @@ export class World {
   }
 
   /**
-   * Grand 2-Story Alpine Chalet Homestead
-   * Features: Whitewashed stone foundation, timber upper floor, true gabled roof with eaves,
-   * wrap-around veranda with steps, stone chimney with smoke puffs, flower boxes, and wood shed
+   * Premium Stylized Alpine Farmhouse (Milestone B Blender Reconstruction)
+   * Loads public/models/farmhouse_exterior.glb via AssetPipeline
+   * Features: Fieldstone plinth, half-timbering, cedar shingles, veranda porch,
+   * recessed door, windows with flower boxes, stone chimney, woodshed, and -col proxies.
    */
   buildAlpineFarmhouse() {
-    const houseGroup = new THREE.Group();
     const houseX = 0;
     const terraceElevation = 0.6;
     const houseZ = -34;
-    houseGroup.position.set(houseX, terraceElevation, houseZ);
-
-    const woodMat = this.materials.wood;
-    const logMat = this.materials.timberLog;
-    const roofMat = this.materials.roof;
-    const stoneMat = this.materials.stoneWall;
-    const stuccoMat = this.materials.whiteStucco;
-    const brickMat = this.materials.brick;
-    const windowMat = this.materials.windowWarm;
-
-    const houseW = 12.0;
-    const houseD = 9.4;
-
-    // 1. Whitewashed Fieldstone Ground Floor (Height 3.4m)
-    const groundFloorH = 3.4;
-    const groundFloor = new THREE.Mesh(new THREE.BoxGeometry(houseW, groundFloorH, houseD), stuccoMat);
-    groundFloor.position.set(0, groundFloorH / 2, 0);
-    groundFloor.castShadow = true;
-    groundFloor.receiveShadow = true;
-    houseGroup.add(groundFloor);
-
-    // Stone foundation skirting
-    const skirting = new THREE.Mesh(new THREE.BoxGeometry(houseW + 0.3, 0.9, houseD + 0.3), stoneMat);
-    skirting.position.set(0, 0.45, 0);
-    skirting.castShadow = true;
-    houseGroup.add(skirting);
-
-    // Timber corner posts & belt course
-    const postG = new THREE.BoxGeometry(0.35, groundFloorH, 0.35);
-    [
-      [-houseW / 2, -houseD / 2], [houseW / 2, -houseD / 2],
-      [-houseW / 2, houseD / 2], [houseW / 2, houseD / 2]
-    ].forEach(([cx, cz]) => {
-      const post = new THREE.Mesh(postG, logMat);
-      post.position.set(cx, groundFloorH / 2, cz);
-      post.castShadow = true;
-      houseGroup.add(post);
-    });
-
-    const beltCourse = new THREE.Mesh(new THREE.BoxGeometry(houseW + 0.4, 0.25, houseD + 0.4), logMat);
-    beltCourse.position.set(0, groundFloorH, 0);
-    beltCourse.castShadow = true;
-    houseGroup.add(beltCourse);
-
-    // 2. Timber Plank Upper Story (Height 2.8m)
-    const upperH = 2.8;
-    const upperFloor = new THREE.Mesh(new THREE.BoxGeometry(houseW - 0.2, upperH, houseD - 0.2), woodMat);
-    upperFloor.position.set(0, groundFloorH + upperH / 2, 0);
-    upperFloor.castShadow = true;
-    upperFloor.receiveShadow = true;
-    houseGroup.add(upperFloor);
-
-    // Cantilevered Upper Balcony
-    const balconyW = 6.0;
-    const balconyD = 1.6;
-    const balconyDeck = new THREE.Mesh(new THREE.BoxGeometry(balconyW, 0.2, balconyD), woodMat);
-    balconyDeck.position.set(0, groundFloorH + 0.1, houseD / 2 + balconyD / 2 - 0.1);
-    balconyDeck.castShadow = true;
-    houseGroup.add(balconyDeck);
-
-    // Balcony Railing with carved timber spindles
-    const balRailing = new THREE.Mesh(new THREE.BoxGeometry(balconyW, 0.85, 0.1), logMat);
-    balRailing.position.set(0, groundFloorH + 0.55, houseD / 2 + balconyD - 0.15);
-    houseGroup.add(balRailing);
-
-    // 3. TRUE ALPINE GABLED ROOF WITH OVERHANGING EAVES
-    // Two pitched roof slopes meeting at the central horizontal ridge beam
-    const roofSlopeW = houseW + 1.6;
-    const roofSlopeL = (houseD / 2) * 1.35;
-    const roofPitch = 0.62; // ~35 degrees
-
-    // South roof slope (front)
-    const southSlope = new THREE.Mesh(new THREE.BoxGeometry(roofSlopeW, 0.22, roofSlopeL), roofMat);
-    southSlope.position.set(0, groundFloorH + upperH + 1.25, houseD / 4 + 0.2);
-    southSlope.rotation.x = roofPitch;
-    southSlope.castShadow = true;
-    southSlope.receiveShadow = true;
-    houseGroup.add(southSlope);
-
-    // North roof slope (back)
-    const northSlope = new THREE.Mesh(new THREE.BoxGeometry(roofSlopeW, 0.22, roofSlopeL), roofMat);
-    northSlope.position.set(0, groundFloorH + upperH + 1.25, -houseD / 4 - 0.2);
-    northSlope.rotation.x = -roofPitch;
-    northSlope.castShadow = true;
-    northSlope.receiveShadow = true;
-    houseGroup.add(northSlope);
-
-    // Ridge beam cap
-    const ridgeCap = new THREE.Mesh(new THREE.BoxGeometry(roofSlopeW + 0.2, 0.25, 0.4), logMat);
-    ridgeCap.position.set(0, groundFloorH + upperH + 2.55, 0);
-    ridgeCap.castShadow = true;
-    houseGroup.add(ridgeCap);
-
-    // Triangular Gable Attic Wall Panels (Enclosing West & East attic under gables cleanly)
-    const gableWest = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.2, houseD * 0.72), woodMat);
-    gableWest.position.set(-houseW / 2 + 0.05, groundFloorH + upperH + 1.1, 0);
-    houseGroup.add(gableWest);
-
-    const gableEast = new THREE.Mesh(new THREE.BoxGeometry(0.18, 2.2, houseD * 0.72), woodMat);
-    gableEast.position.set(houseW / 2 - 0.05, groundFloorH + upperH + 1.1, 0);
-    houseGroup.add(gableEast);
-
-    // Attic Dormer Window
-    const dormer = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.4, 1.6), woodMat);
-    dormer.position.set(0, groundFloorH + upperH + 1.2, houseD / 4 + 0.6);
-    dormer.castShadow = true;
-    houseGroup.add(dormer);
-
-    const dormerWin = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.9, 0.1), windowMat);
-    dormerWin.position.set(0, groundFloorH + upperH + 1.2, houseD / 4 + 1.45);
-    houseGroup.add(dormerWin);
-
-    // 4. Sturdy Fieldstone Chimney with Rising Smoke Puffs
-    const chimney = new THREE.Mesh(new THREE.BoxGeometry(1.6, 9.8, 1.8), brickMat);
-    chimney.position.set(houseW / 2 + 0.2, 4.9, 0.6);
-    chimney.castShadow = true;
-    chimney.receiveShadow = true;
-    houseGroup.add(chimney);
-
-    const chimneyCap = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.3, 2.1), stoneMat);
-    chimneyCap.position.set(houseW / 2 + 0.2, 9.9, 0.6);
-    chimneyCap.castShadow = true;
-    houseGroup.add(chimneyCap);
-
-    const potGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.6, 8);
-    const pot1 = new THREE.Mesh(potGeo, stoneMat); pot1.position.set(houseW / 2 + 0.2, 10.35, 0.2); houseGroup.add(pot1);
-    const pot2 = new THREE.Mesh(potGeo, stoneMat); pot2.position.set(houseW / 2 + 0.2, 10.35, 1.0); houseGroup.add(pot2);
 
     this.chimneySmokeOrigin = new THREE.Vector3(
-      houseX + houseW / 2 + 0.2,
-      terraceElevation + 10.7,
-      houseZ + 0.6
+      houseX + 5.2,
+      terraceElevation + 7.6,
+      houseZ - 1.2
     );
 
-    // 5. Wrap-Around Front Veranda (Porch)
-    const porchW = houseW + 0.8;
-    const porchD = 3.2;
-    const porchH = 0.4;
-    const porchDeck = new THREE.Mesh(new THREE.BoxGeometry(porchW, porchH, porchD), woodMat);
-    porchDeck.position.set(0, porchH / 2, houseD / 2 + porchD / 2);
-    porchDeck.castShadow = true;
-    porchDeck.receiveShadow = true;
-    houseGroup.add(porchDeck);
-
-    // Heavy timber porch log pillars
-    const pillarGeo = new THREE.CylinderGeometry(0.14, 0.16, 2.8, 8);
-    [-porchW / 2 + 0.4, -porchW / 4, 0, porchW / 4, porchW / 2 - 0.4].forEach(px => {
-      const pil = new THREE.Mesh(pillarGeo, logMat);
-      pil.position.set(px, 1.8, houseD / 2 + porchD - 0.3);
-      pil.castShadow = true;
-      houseGroup.add(pil);
-    });
-
-    // Veranda Overhang Roof
-    const porchRoof = new THREE.Mesh(new THREE.BoxGeometry(porchW + 0.4, 0.28, porchD + 0.6), roofMat);
-    porchRoof.position.set(0, 3.25, houseD / 2 + porchD / 2);
-    porchRoof.rotation.x = 0.14;
-    porchRoof.castShadow = true;
-    houseGroup.add(porchRoof);
-
-    // Rustic Porch Bench
-    const benchGroup = new THREE.Group();
-    benchGroup.position.set(houseW / 4 + 0.6, 0.4, houseD / 2 + 1.2);
-    const bSeat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.55), woodMat);
-    bSeat.position.set(0, 0.45, 0);
-    benchGroup.add(bSeat);
-    const bBack = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 0.08), woodMat);
-    bBack.position.set(0, 0.72, -0.24);
-    benchGroup.add(bBack);
-    [-0.75, 0.75].forEach(bx => {
-      const bLeg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.45), logMat);
-      bLeg.position.set(bx, 0.22, 0);
-      benchGroup.add(bLeg);
-    });
-    houseGroup.add(benchGroup);
-
-    // Warm Hanging Porch Lantern on pillar
-    const lanternGroup = new THREE.Group();
-    lanternGroup.position.set(-porchW / 4, 2.5, houseD / 2 + porchD - 0.3);
-    const lFrame = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.28, 6), this.materials.ironMetal);
-    lanternGroup.add(lFrame);
-    const lGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.2, 6), this.materials.windowWarm);
-    lanternGroup.add(lGlass);
+    // Warm hanging porch lantern light
     const lLight = new THREE.PointLight(0xfef08a, 0.9, 8);
+    lLight.position.set(houseX, terraceElevation + 2.4, houseZ + 6.0);
     this.lanternLight = lLight;
-    lanternGroup.add(lLight);
-    houseGroup.add(lanternGroup);
+    this.scene.add(lLight);
 
-    // Porch steps down to terrace top
-    const pStep = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.2, 0.6), woodMat);
-    pStep.position.set(0, 0.1, houseD / 2 + porchD + 0.3);
-    pStep.receiveShadow = true;
-    houseGroup.add(pStep);
+    // Immediate interactive front door proxy so interactables array is immediately ready
+    const doorProxyMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 2.4, 0.4),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    doorProxyMesh.position.set(houseX, terraceElevation + 1.2, houseZ + 3.8);
+    this.scene.add(doorProxyMesh);
 
-    // 6. Front Door & Hanging Lanterns
-    const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.5, 0.18), logMat);
-    doorFrame.position.set(0, 1.65, houseD / 2 + 0.05);
-    houseGroup.add(doorFrame);
-
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.2, 0.1), woodMat);
-    door.position.set(0, 1.5, houseD / 2 + 0.1);
-    door.castShadow = true;
-    houseGroup.add(door);
-
-    // Decorative iron hinges & ring handle
-    const hingeGeo = new THREE.BoxGeometry(0.18, 0.04, 0.02);
-    const h1 = new THREE.Mesh(hingeGeo, this.materials.ironMetal); h1.position.set(-0.48, 2.1, houseD / 2 + 0.16); houseGroup.add(h1);
-    const h2 = new THREE.Mesh(hingeGeo, this.materials.ironMetal); h2.position.set(-0.48, 0.9, houseD / 2 + 0.16); houseGroup.add(h2);
-
-    const ringHandle = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), this.materials.ironMetal);
-    ringHandle.position.set(0.42, 1.45, houseD / 2 + 0.17);
-    houseGroup.add(ringHandle);
-
-    // Register front door interactable: [E] Enter Farmhouse
-    this.interactables.push({
+    const doorInteractable = {
       id: 'house_front_door',
-      mesh: door,
-      name: 'Alpine Farmhouse',
+      mesh: doorProxyMesh,
+      name: 'Alpine Farmhouse Front Door',
       prompt: 'Enter Farmhouse',
       ready: true,
       interact: (player) => {
+        if (this.farmhouseDoorLeaf) {
+          this.farmhouseDoorLeaf.rotation.y = Math.PI / 2;
+        }
+        sounds.playInteract();
         const fade = document.getElementById('screen-fade');
         if (fade) {
           fade.classList.add('active');
           setTimeout(() => {
             player.respawn(new THREE.Vector3(160, 1.2, 161.5));
-            player.yaw = 0.0; // facing inside towards hearth at z=155
+            player.yaw = 0.0;
             player.pitch = 0.0;
-            setTimeout(() => {
-              fade.classList.remove('active');
-            }, 250);
+            setTimeout(() => { fade.classList.remove('active'); }, 250);
           }, 300);
         } else {
           player.respawn(new THREE.Vector3(160, 1.2, 161.5));
           player.yaw = 0.0;
         }
-        const evt = new CustomEvent('game:message', { detail: { message: '🏡 Entered cozy Alpine Farmhouse' } });
-        window.dispatchEvent(evt);
+        window.dispatchEvent(new CustomEvent('game:message', { detail: { message: '🏡 Entered cozy Alpine Farmhouse' } }));
       }
-    });
+    };
+    this.interactables.push(doorInteractable);
 
-    [-1.2, 1.2].forEach(lx => {
-      const lant = new THREE.Mesh(new THREE.DodecahedronGeometry(0.18, 0), windowMat);
-      lant.position.set(lx, 2.7, houseD / 2 + 0.2);
-      houseGroup.add(lant);
-    });
-
-    // 7. Ground Floor Windows with Flower Boxes
-    [-3.6, -1.8, 1.8, 3.6].forEach(wx => {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 0.12), windowMat);
-      win.position.set(wx, 2.1, houseD / 2 + 0.05);
-      houseGroup.add(win);
-
-      const fBox = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.25, 0.35), logMat);
-      fBox.position.set(wx, 1.3, houseD / 2 + 0.22);
-      houseGroup.add(fBox);
-
-      for (let f = 0; f < 6; f++) {
-        const fl = new THREE.Mesh(
-          new THREE.SphereGeometry(0.09, 6, 6),
-          f % 2 === 0 ? this.materials.poppy : this.materials.buttercup
-        );
-        fl.position.set(wx - 0.6 + f * 0.24, 1.5, houseD / 2 + 0.22);
-        houseGroup.add(fl);
-      }
-    });
-
-    // 8. Attached Wood Shed on West Wall
-    const shedW = 3.4;
-    const shedH = 2.4;
-    const shedD = 4.2;
-    const shed = new THREE.Mesh(new THREE.BoxGeometry(shedW, shedH, shedD), woodMat);
-    shed.position.set(-houseW / 2 - shedW / 2, shedH / 2, 0);
-    shed.castShadow = true;
-    houseGroup.add(shed);
-
-    const shedRoof = new THREE.Mesh(new THREE.BoxGeometry(shedW + 0.4, 0.2, shedD + 0.4), roofMat);
-    shedRoof.position.set(-houseW / 2 - shedW / 2, shedH + 0.1, 0);
-    shedRoof.rotation.z = -0.18;
-    houseGroup.add(shedRoof);
-
-    // Chopped firewood stack
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 6; col++) {
-        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.2, 7), logMat);
-        log.rotation.x = Math.PI / 2;
-        log.position.set(
-          -houseW / 2 - 0.6 - col * 0.26,
-          0.2 + row * 0.26,
-          -0.8 + (col % 2) * 0.1
-        );
-        log.castShadow = true;
-        houseGroup.add(log);
-      }
-    }
-
-    // Chopping block with axe
-    const block = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.6, 8), logMat);
-    block.position.set(-houseW / 2 - 2.2, 0.3, 2.2);
-    block.castShadow = true;
-    houseGroup.add(block);
-
-    const axe = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.2), this.materials.ironMetal);
-    axe.position.set(-houseW / 2 - 2.2, 0.68, 2.2);
-    houseGroup.add(axe);
-
-    this.scene.add(houseGroup);
-
-    // Colliders
-    const mainBox = new THREE.Box3(
-      new THREE.Vector3(houseX - houseW / 2 - 0.4, terraceElevation, houseZ - houseD / 2 - 0.4),
-      new THREE.Vector3(houseX + houseW / 2 + 0.4, terraceElevation + 8.5, houseZ + houseD / 2 + 0.4)
-    );
-    this.world.colliders.push({ box: mainBox, mesh: groundFloor, type: 'solid' });
-
-    const porchBox = new THREE.Box3(
-      new THREE.Vector3(houseX - porchW / 2, terraceElevation, houseZ + houseD / 2),
-      new THREE.Vector3(houseX + porchW / 2, terraceElevation + 0.4, houseZ + houseD / 2 + porchD)
-    );
-    this.world.colliders.push({ box: porchBox, mesh: porchDeck, type: 'solid' });
-
-    // 6 soft rising smoke puffs
+    // Soft rising smoke puffs from stone chimney flue
     const smokeMat = new THREE.MeshLambertMaterial({
       color: 0xe2e8f0,
       transparent: true,
@@ -1006,7 +736,7 @@ export class World {
       flatShading: true
     });
     for (let s = 0; s < 6; s++) {
-      const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4 + s * 0.15, 1), smokeMat);
+      const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35 + s * 0.12, 1), smokeMat);
       puff.position.copy(this.chimneySmokeOrigin);
       puff.position.y += s * 0.8;
       this.scene.add(puff);
@@ -1016,315 +746,266 @@ export class World {
         offset: s * 1.2
       });
     }
+
+    // Load handcrafted Blender Farmhouse Exterior GLB via AssetPipeline
+    assetPipeline.loadModel('/models/farmhouse_exterior.glb', {
+      castShadow: true,
+      receiveShadow: true,
+      collision: 'none' // explicit -col meshes exist
+    }).then(({ model, colliders }) => {
+      model.position.set(houseX, terraceElevation, houseZ);
+      model.rotation.y = Math.PI;
+      model.updateMatrixWorld(true);
+      this.scene.add(model);
+      this.farmhouseExteriorModel = model;
+
+      // Register extracted collision proxies with rotation updated
+      colliders.forEach(col => {
+        col.box.setFromObject(col.mesh);
+        this.world.colliders.push({ box: col.box, mesh: col.mesh, type: 'solid' });
+      });
+
+      // Bind door leaf
+      const doorLeaf = model.getObjectByName('door_leaf');
+      if (doorLeaf) {
+        this.farmhouseDoorLeaf = doorLeaf;
+        doorInteractable.mesh = doorLeaf;
+      }
+
+      // Update chimney smoke origin from model's empty node
+      const smokeEmpty = model.getObjectByName('chimney_smoke_origin');
+      if (smokeEmpty) {
+        smokeEmpty.getWorldPosition(this.chimneySmokeOrigin);
+      }
+    }).catch(err => {
+      console.warn('[World] Failed to load farmhouse_exterior.glb, using fallback proxy', err);
+    });
   }
 
   /**
-   * Cozy Alpine Farmhouse Interior Scene at (160, 0, 160)
-   * Completely isolated room with fireplace/hearth, quilted bed, dining table, chairs,
-   * kitchen shelving, storage trunk, braided rug, warm interior lighting, and exit door.
+   * Fully Designed Cozy Alpine Farmhouse Interior (Milestone B Blender Reconstruction)
+   * Loads public/models/farmhouse_interior.glb via AssetPipeline
+   * Features: Cedar floorboards, timber beams, fieldstone hearth, quilted bed,
+   * trestle dining table, kitchen shelves, storage chest, and full interactive mechanics.
    */
   buildFarmhouseInterior() {
-    const intGroup = new THREE.Group();
     const originX = 160;
     const originZ = 160;
-    intGroup.position.set(originX, 0, originZ);
+    const roomH = 3.6;
 
-    const woodMat = this.materials.wood;
-    const logMat = this.materials.timberLog;
-    const stoneMat = this.materials.stoneWall;
-    const stuccoMat = this.materials.whiteStucco;
-    const ironMat = this.materials.ironMetal;
-
-    const roomW = 10.0;
-    const roomD = 10.0;
-    const roomH = 3.8;
-
-    // 1. Cedar Floorboards
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.2, roomD), woodMat);
-    floor.position.set(0, -0.1, -1.0);
-    floor.receiveShadow = true;
-    intGroup.add(floor);
-
-    // 2. Ceiling & Heavy Timber Beams
-    const ceiling = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.2, roomD), woodMat);
-    ceiling.position.set(0, roomH, -1.0);
-    intGroup.add(ceiling);
-
-    for (let b = 0; b < 4; b++) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.32, 0.32), logMat);
-      beam.position.set(0, roomH - 0.16, -4.5 + b * 2.4);
-      beam.castShadow = true;
-      intGroup.add(beam);
-    }
-
-    // 3. Walls
-    // North Wall with fireplace opening
-    const wallN1 = new THREE.Mesh(new THREE.BoxGeometry(3.6, roomH, 0.3), stuccoMat);
-    wallN1.position.set(-3.2, roomH / 2, -6.0);
-    intGroup.add(wallN1);
-    const wallN2 = new THREE.Mesh(new THREE.BoxGeometry(3.6, roomH, 0.3), stuccoMat);
-    wallN2.position.set(3.2, roomH / 2, -6.0);
-    intGroup.add(wallN2);
-
-    // South Wall (with doorway at center)
-    const wallS1 = new THREE.Mesh(new THREE.BoxGeometry(4.0, roomH, 0.3), stuccoMat);
-    wallS1.position.set(-3.0, roomH / 2, 4.0);
-    intGroup.add(wallS1);
-    const wallS2 = new THREE.Mesh(new THREE.BoxGeometry(4.0, roomH, 0.3), stuccoMat);
-    wallS2.position.set(3.0, roomH / 2, 4.0);
-    intGroup.add(wallS2);
-    const wallSHeader = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.2, 0.3), stuccoMat);
-    wallSHeader.position.set(0, roomH - 0.6, 4.0);
-    intGroup.add(wallSHeader);
-
-    // West Wall
-    const wallW = new THREE.Mesh(new THREE.BoxGeometry(0.3, roomH, roomD), stuccoMat);
-    wallW.position.set(-roomW / 2, roomH / 2, -1.0);
-    intGroup.add(wallW);
-
-    // East Wall
-    const wallE = new THREE.Mesh(new THREE.BoxGeometry(0.3, roomH, roomD), stuccoMat);
-    wallE.position.set(roomW / 2, roomH / 2, -1.0);
-    intGroup.add(wallE);
-
-    // Baseboards
-    const baseboardN = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.25, 0.1), logMat);
-    baseboardN.position.set(0, 0.12, -5.85);
-    intGroup.add(baseboardN);
-
-    // 4. Fireplace & Fieldstone Hearth
-    const hearthMantle = new THREE.Mesh(new THREE.BoxGeometry(3.0, 3.2, 0.8), stoneMat);
-    hearthMantle.position.set(0, 1.6, -5.7);
-    hearthMantle.castShadow = true;
-    intGroup.add(hearthMantle);
-
-    // Firebox opening cavity
-    const firebox = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 1.4, 0.7),
-      new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.95 })
-    );
-    firebox.position.set(0, 0.7, -5.5);
-    intGroup.add(firebox);
-
-    // Mantle shelf
-    const shelf = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.14, 0.45), logMat);
-    shelf.position.set(0, 2.9, -5.3);
-    shelf.castShadow = true;
-    intGroup.add(shelf);
-
-    // Clock on mantle
-    const clock = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, 0.15), woodMat);
-    clock.position.set(0, 3.15, -5.3);
-    intGroup.add(clock);
-
-    // Burning Cedar Logs & Glowing Embers
-    const emberMat = new THREE.MeshStandardMaterial({
-      color: 0xf97316,
-      emissive: 0xea580c,
-      emissiveIntensity: 2.2,
-      roughness: 0.4
-    });
-    for (let l = 0; l < 3; l++) {
-      const emberLog = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.8, 8), emberMat);
-      emberLog.rotation.z = Math.PI / 2 + (l - 1) * 0.2;
-      emberLog.position.set((l - 1) * 0.22, 0.25 + l * 0.08, -5.45);
-      intGroup.add(emberLog);
-    }
-
-    // Warm Hearth Point Light (optimized without redundant 6-face cubemap shadows)
-    const hearthLight = new THREE.PointLight(0xff7a18, 2.8, 14, 1.5);
-    hearthLight.position.set(0, 1.1, -5.2);
-    hearthLight.castShadow = false;
-    intGroup.add(hearthLight);
-
-    // Hearth Rug in front of fireplace
-    const hearthRug = new THREE.Mesh(
-      new THREE.BoxGeometry(2.8, 0.02, 1.6),
-      new THREE.MeshStandardMaterial({ color: 0x991b1b, roughness: 0.9 })
-    );
-    hearthRug.position.set(0, 0.01, -4.2);
-    intGroup.add(hearthRug);
-
-    // 5. Cozy Quilted Bed in North-West Corner
-    const bedX = -3.2;
-    const bedZ = -4.2;
-    const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.55, 2.8), woodMat);
-    bedFrame.position.set(bedX, 0.28, bedZ);
-    bedFrame.castShadow = true;
-    intGroup.add(bedFrame);
-
-    const headboard = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 0.16), logMat);
-    headboard.position.set(bedX, 0.9, bedZ - 1.35);
-    headboard.castShadow = true;
-    intGroup.add(headboard);
-
-    // Mattress & Quilted Blanket
-    const mattress = new THREE.Mesh(
-      new THREE.BoxGeometry(1.9, 0.35, 2.5),
-      new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.85 })
-    );
-    mattress.position.set(bedX, 0.65, bedZ);
-    intGroup.add(mattress);
-
-    const quilt = new THREE.Mesh(
-      new THREE.BoxGeometry(1.95, 0.28, 1.8),
-      new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.9 })
-    );
-    quilt.position.set(bedX, 0.72, bedZ + 0.35);
-    quilt.castShadow = true;
-    intGroup.add(quilt);
-
-    const pillow = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 0.22, 0.55),
-      new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.85 })
-    );
-    pillow.position.set(bedX, 0.8, bedZ - 0.95);
-    pillow.rotation.x = 0.15;
-    intGroup.add(pillow);
-
-    // 6. Bedside Nightstand & Candle
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.65, 0.8), woodMat);
-    stand.position.set(bedX + 1.6, 0.32, bedZ - 1.0);
-    stand.castShadow = true;
-    intGroup.add(stand);
-
-    const candle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.04, 0.04, 0.18, 8),
-      new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xfacc15, emissiveIntensity: 0.8 })
-    );
-    candle.position.set(bedX + 1.6, 0.74, bedZ - 1.0);
-    intGroup.add(candle);
-
-    // 7. Storage Trunk / Chest near Bed
-    const trunk = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.65, 0.75), woodMat);
-    trunk.position.set(bedX, 0.32, bedZ + 1.8);
-    trunk.castShadow = true;
-    intGroup.add(trunk);
-
-    const trunkBand1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.67, 0.77), ironMat);
-    trunkBand1.position.set(bedX - 0.45, 0.32, bedZ + 1.8);
-    intGroup.add(trunkBand1);
-    const trunkBand2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.67, 0.77), ironMat);
-    trunkBand2.position.set(bedX + 0.45, 0.32, bedZ + 1.8);
-    intGroup.add(trunkBand2);
-
-    // 8. Wooden Dining Table & Chairs on East side
-    const tableX = 3.0;
-    const tableZ = -1.5;
-    const table = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.85, 1.4), woodMat);
-    table.position.set(tableX, 0.425, tableZ);
-    table.castShadow = true;
-    intGroup.add(table);
-
-    // 2 Chairs
-    [-1.0, 1.0].forEach(cy => {
-      const chair = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.5, 0.65), woodMat);
-      chair.position.set(tableX + cy * 1.5, 0.25, tableZ);
-      chair.castShadow = true;
-      intGroup.add(chair);
-
-      const backrest = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.75, 0.65), logMat);
-      backrest.position.set(tableX + cy * 1.8, 0.75, tableZ);
-      intGroup.add(backrest);
-    });
-
-    // Bread bowl & table lamp
-    const breadBowl = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.16, 0.12, 10),
-      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 })
-    );
-    breadBowl.position.set(tableX - 0.3, 0.91, tableZ);
-    intGroup.add(breadBowl);
-
-    const tableLamp = new THREE.PointLight(0xfef08a, 1.3, 8, 1.2);
-    tableLamp.position.set(tableX, 1.6, tableZ);
-    intGroup.add(tableLamp);
-
-    // 9. Kitchen Shelves in South-East Corner
-    for (let s = 0; s < 3; s++) {
-      const kShelf = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 0.45), logMat);
-      kShelf.position.set(3.8, 1.4 + s * 0.65, 2.4);
-      intGroup.add(kShelf);
-
-      for (let j = 0; j < 3; j++) {
-        const jar = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.10, 0.12, 0.25, 8),
-          new THREE.MeshStandardMaterial({ color: 0xc2410c, roughness: 0.7 })
-        );
-        jar.position.set(3.2 + j * 0.5, 1.56 + s * 0.65, 2.4);
-        intGroup.add(jar);
-      }
-    }
-
-    // 10. Large Center Braided Rug
-    const centerRug = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.9, 1.9, 0.02, 16),
-      new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.92 })
-    );
-    centerRug.scale.set(1.25, 1.0, 0.9);
-    centerRug.position.set(0, 0.015, -1.0);
-    centerRug.receiveShadow = true;
-    intGroup.add(centerRug);
-
-    // 11. Exit Doorway & Interactive Exit Door
-    const exitDoorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.25), logMat);
-    exitDoorFrame.position.set(0, 1.3, 3.9);
-    intGroup.add(exitDoorFrame);
-
-    const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.4, 0.12), woodMat);
-    exitDoor.position.set(0, 1.2, 3.85);
-    exitDoor.castShadow = true;
-    intGroup.add(exitDoor);
-
-    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.02, 6, 12), ironMat);
-    handle.position.set(0.42, 1.2, 3.78);
-    intGroup.add(handle);
-
-    this.scene.add(intGroup);
-
-    // Solid Floor, Wall & Furniture Colliders for Interior Room
-    const wallColliders = [
-      // Solid floor beneath cedar floorboards (Y=0)
-      new THREE.Box3(new THREE.Vector3(originX - 6.0, -2.0, originZ - 7.0), new THREE.Vector3(originX + 6.0, 0.0, originZ + 5.0)),
-      new THREE.Box3(new THREE.Vector3(originX - 5.2, 0, originZ - 6.4), new THREE.Vector3(originX + 5.2, roomH, originZ - 5.8)),
-      new THREE.Box3(new THREE.Vector3(originX - 5.2, 0, originZ + 3.9), new THREE.Vector3(originX + 5.2, roomH, originZ + 4.5)),
-      new THREE.Box3(new THREE.Vector3(originX - 5.4, 0, originZ - 6.4), new THREE.Vector3(originX - 4.8, roomH, originZ + 4.5)),
-      new THREE.Box3(new THREE.Vector3(originX + 4.8, 0, originZ - 6.4), new THREE.Vector3(originX + 5.4, roomH, originZ + 4.5)),
-      new THREE.Box3(new THREE.Vector3(originX + bedX - 1.2, 0, originZ + bedZ - 1.5), new THREE.Vector3(originX + bedX + 1.2, 1.4, originZ + bedZ + 1.5)),
-      new THREE.Box3(new THREE.Vector3(originX + tableX - 1.3, 0, originZ + tableZ - 0.8), new THREE.Vector3(originX + tableX + 1.3, 1.0, originZ + tableZ + 0.8))
+    this.isSleeping = false;
+    this.isFireLit = true;
+    this.chestItems = [
+      { id: 'seed_carrot', name: 'Carrot Seeds', icon: '🌱', count: 4 },
+      { id: 'seed_wheat', name: 'Wheat Seeds', icon: '🌱', count: 4 },
+      { id: 'seed_pumpkin', name: 'Pumpkin Seeds', icon: '🌱', count: 2 },
+      { id: 'seed_tomato', name: 'Tomato Seeds', icon: '🌱', count: 2 },
+      { id: 'apple', name: 'Fresh Apple', icon: '🍎', count: 3 }
     ];
 
+    // Solid floor beneath cedar floorboards (Y=0) - prevents falling through
+    const floorBox = new THREE.Box3(
+      new THREE.Vector3(originX - 6.0, -2.0, originZ - 6.0),
+      new THREE.Vector3(originX + 6.0, 0.0, originZ + 6.0)
+    );
+    this.world.colliders.push({ box: floorBox, type: 'solid' });
+
+    // Perimeter boundary walls for interior room
+    const wallColliders = [
+      new THREE.Box3(new THREE.Vector3(originX - 5.5, 0, originZ - 4.5), new THREE.Vector3(originX + 5.5, roomH, originZ - 3.5)), // North
+      new THREE.Box3(new THREE.Vector3(originX - 5.5, 0, originZ + 3.5), new THREE.Vector3(originX + 5.5, roomH, originZ + 4.5)), // South
+      new THREE.Box3(new THREE.Vector3(originX - 5.5, 0, originZ - 4.5), new THREE.Vector3(originX - 4.7, roomH, originZ + 4.5)), // West
+      new THREE.Box3(new THREE.Vector3(originX + 4.7, 0, originZ - 4.5), new THREE.Vector3(originX + 5.5, roomH, originZ + 4.5)), // East
+      // Bed and Table obstacle hitboxes
+      new THREE.Box3(new THREE.Vector3(originX - 4.5, 0, originZ - 3.5), new THREE.Vector3(originX - 1.8, 1.2, originZ - 0.8)), // Bed
+      new THREE.Box3(new THREE.Vector3(originX + 1.8, 0, originZ - 2.0), new THREE.Vector3(originX + 4.2, 0.9, originZ + 0.6))  // Table
+    ];
     wallColliders.forEach(box => {
-      this.world.colliders.push({ box, mesh: floor, type: 'solid' });
+      this.world.colliders.push({ box, type: 'solid' });
     });
 
-    // Interactable Exit Door: [E] Leave Farmhouse
-    this.interactables.push({
+    // Warm Hearth Point Light (centered at stone fireplace)
+    const hearthLight = new THREE.PointLight(0xff7a18, 2.8, 14, 1.5);
+    hearthLight.position.set(originX, 1.1, originZ - 2.8);
+    hearthLight.castShadow = false;
+    this.hearthLight = hearthLight;
+    this.scene.add(hearthLight);
+
+    // Warm Ambient Table Lamp
+    const tableLamp = new THREE.PointLight(0xfef08a, 1.2, 8, 1.2);
+    tableLamp.position.set(originX - 3.2, 1.6, originZ - 0.6);
+    this.scene.add(tableLamp);
+
+    // Initial interactables stubs for immediate availability
+    const exitDoorProxy = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 0.4), new THREE.MeshBasicMaterial({ visible: false }));
+    exitDoorProxy.position.set(originX, 1.2, originZ + 3.5);
+    this.scene.add(exitDoorProxy);
+
+    const bedProxy = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 2.4), new THREE.MeshBasicMaterial({ visible: false }));
+    bedProxy.position.set(originX - 3.1, 0.4, originZ - 2.1);
+    this.scene.add(bedProxy);
+
+    const hearthProxy = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.0, 1.2), new THREE.MeshBasicMaterial({ visible: false }));
+    hearthProxy.position.set(originX, 1.0, originZ - 2.8);
+    this.scene.add(hearthProxy);
+
+    const chestProxy = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 0.7), new THREE.MeshBasicMaterial({ visible: false }));
+    chestProxy.position.set(originX + 1.8, 0.35, originZ + 2.7);
+    this.scene.add(chestProxy);
+
+    // 1. Exit Door Interactable
+    const exitDoorInteractable = {
       id: 'house_exit_door',
-      mesh: exitDoor,
+      mesh: exitDoorProxy,
       name: 'Front Door',
       prompt: 'Leave Farmhouse',
       ready: true,
       interact: (player) => {
+        sounds.playInteract();
         const fade = document.getElementById('screen-fade');
         if (fade) {
           fade.classList.add('active');
           setTimeout(() => {
             player.respawn(new THREE.Vector3(0, 1.2, -27.5));
-            player.yaw = 0.0; // facing south out into the valley
+            player.yaw = 0.0;
             player.pitch = 0.0;
-            setTimeout(() => {
-              fade.classList.remove('active');
-            }, 250);
+            setTimeout(() => { fade.classList.remove('active'); }, 250);
           }, 300);
         } else {
           player.respawn(new THREE.Vector3(0, 1.2, -27.5));
           player.yaw = 0.0;
         }
-        const evt = new CustomEvent('game:message', { detail: { message: '☀️ Left Farmhouse, stepped onto veranda' } });
-        window.dispatchEvent(evt);
+        window.dispatchEvent(new CustomEvent('game:message', { detail: { message: '☀️ Left Farmhouse, stepped onto veranda' } }));
       }
+    };
+    this.interactables.push(exitDoorInteractable);
+
+    // 2. Bed Sleep Interactable (Safeguarded: no duplicate rollover)
+    const bedInteractable = {
+      id: 'house_bed',
+      mesh: bedProxy,
+      name: 'Quilted Bed',
+      prompt: 'Sleep until Morning (06:00)',
+      ready: true,
+      interact: (player) => {
+        if (this.isSleeping) return;
+        this.isSleeping = true;
+        sounds.playInteract();
+
+        const fade = document.getElementById('screen-fade');
+        if (fade) fade.classList.add('active');
+
+        setTimeout(() => {
+          const tm = this.timeManager || window.timeManager;
+          if (tm) {
+            tm.sleepUntilMorning(6);
+          }
+          player.stamina = 100;
+          player.isExhausted = false;
+          player.respawn(new THREE.Vector3(originX - 1.6, 1.2, originZ - 2.1));
+          player.yaw = Math.PI / 2;
+
+          setTimeout(() => {
+            if (fade) fade.classList.remove('active');
+            this.isSleeping = false;
+            const dayNum = tm ? tm.day : 1;
+            window.dispatchEvent(new CustomEvent('game:message', {
+              detail: { message: `☀️ Slept peacefully until sunrise (Day ${dayNum}). Stamina restored to 100%!` }
+            }));
+          }, 300);
+        }, 500);
+      }
+    };
+    this.interactables.push(bedInteractable);
+
+    // 3. Fireplace Light Toggle Interactable
+    const fireplaceInteractable = {
+      id: 'house_fireplace',
+      mesh: hearthProxy,
+      name: 'Stone Fireplace',
+      prompt: 'Extinguish Fireplace',
+      ready: true,
+      interact: (player) => {
+        this.isFireLit = !this.isFireLit;
+        if (this.hearthLight) {
+          this.hearthLight.visible = this.isFireLit;
+        }
+        sounds.playInteract();
+        fireplaceInteractable.prompt = this.isFireLit ? 'Extinguish Fireplace' : 'Light Fireplace';
+        const msg = this.isFireLit
+          ? '🔥 Lit the fireplace — cozy warmth fills the cabin'
+          : '💨 Extinguished the fireplace';
+        window.dispatchEvent(new CustomEvent('game:message', { detail: { message: msg } }));
+      }
+    };
+    this.interactables.push(fireplaceInteractable);
+
+    // 4. Storage Chest Interactable
+    const chestInteractable = {
+      id: 'house_chest',
+      mesh: chestProxy,
+      name: 'Storage Chest',
+      prompt: 'Open Storage Chest',
+      ready: true,
+      interact: (player) => {
+        if (this.interiorChestLid) {
+          this.interiorChestLid.rotation.x = -Math.PI / 3;
+        }
+        sounds.playInteract();
+        window.dispatchEvent(new CustomEvent('storage:open', { detail: { chest: this.chestItems } }));
+      }
+    };
+    this.interactables.push(chestInteractable);
+
+    // Load handcrafted Blender Farmhouse Interior GLB via AssetPipeline
+    assetPipeline.loadModel('/models/farmhouse_interior.glb', {
+      castShadow: true,
+      receiveShadow: true,
+      collision: 'none'
+    }).then(({ model, colliders }) => {
+      model.position.set(originX, 0, originZ);
+      model.rotation.y = Math.PI;
+      model.updateMatrixWorld(true);
+      this.scene.add(model);
+      this.farmhouseInteriorModel = model;
+
+      // Register extracted collision proxies with rotation updated
+      colliders.forEach(col => {
+        col.box.setFromObject(col.mesh);
+        this.world.colliders.push({ box: col.box, mesh: col.mesh, type: 'solid' });
+      });
+
+      // Bind node meshes to interactables
+      const exitLeaf = model.getObjectByName('exit_door_leaf');
+      if (exitLeaf) exitDoorInteractable.mesh = exitLeaf;
+
+      const bedNode = model.getObjectByName('bed_sleep_node') || model.getObjectByName('Bed_Quilt');
+      if (bedNode) bedInteractable.mesh = bedNode;
+
+      const hearthNode = model.getObjectByName('hearth_light_anchor') || model.getObjectByName('Fireplace_Logs');
+      if (hearthNode) fireplaceInteractable.mesh = hearthNode;
+
+      const chestBody = model.getObjectByName('chest_body');
+      if (chestBody) chestInteractable.mesh = chestBody;
+
+      const chestLid = model.getObjectByName('chest_lid');
+      if (chestLid) this.interiorChestLid = chestLid;
+    }).catch(err => {
+      console.warn('[World] Failed to load farmhouse_interior.glb, using fallback proxy', err);
     });
+  }
+
+  restoreHouseState(data) {
+    if (!data) return;
+    if (typeof data.fireLit === 'boolean') {
+      this.isFireLit = data.fireLit;
+      if (this.hearthLight) this.hearthLight.visible = this.isFireLit;
+      const fp = this.interactables.find(i => i.id === 'house_fireplace');
+      if (fp) fp.prompt = this.isFireLit ? 'Extinguish Fireplace' : 'Light Fireplace';
+    }
+    if (Array.isArray(data.chest)) {
+      this.chestItems = data.chest;
+    }
   }
 
   /**
@@ -2691,6 +2372,11 @@ export class World {
         s.mesh.position.copy(this.chimneySmokeOrigin);
         s.mesh.scale.set(1, 1, 1);
       }
+    }
+
+    // 5. Hearth firelight organic flicker
+    if (this.isFireLit && this.hearthLight) {
+      this.hearthLight.intensity = 2.6 + Math.sin(totalTime * 8) * 0.2 + Math.sin(totalTime * 17) * 0.12;
     }
   }
 
