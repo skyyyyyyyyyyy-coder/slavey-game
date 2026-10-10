@@ -11,16 +11,20 @@ def clear_scene():
     for block in bpy.data.materials:
         if block.users == 0: bpy.data.materials.remove(block)
 
-def get_or_create_material(name, base_color, roughness=0.7, metallic=0.0):
+def get_or_create_material(name, base_color, roughness=0.7, metallic=0.0, alpha=1.0):
     mat = bpy.data.materials.get(name)
     if not mat:
         mat = bpy.data.materials.new(name=name)
         mat.use_nodes = True
         bsdf = mat.node_tree.nodes.get('Principled BSDF')
         if bsdf:
-            bsdf.inputs['Base Color'].default_value = base_color
+            bsdf.inputs['Base Color'].default_value = (base_color[0], base_color[1], base_color[2], alpha)
             bsdf.inputs['Roughness'].default_value = roughness
             bsdf.inputs['Metallic'].default_value = metallic
+            if alpha < 1.0:
+                mat.blend_method = 'BLEND'
+                if 'Alpha' in bsdf.inputs:
+                    bsdf.inputs['Alpha'].default_value = alpha
     return mat
 
 def create_box(name, size, location, material=None, parent=None):
@@ -40,20 +44,22 @@ def build_farmhouse_exterior():
     clear_scene()
 
     # Materials Palette - Stylized Alpine Farmhouse
-    mat_stone = get_or_create_material("Stone_Foundation", (0.36, 0.34, 0.32, 1.0), roughness=0.92)
-    mat_stone_trim = get_or_create_material("Stone_Trim", (0.44, 0.42, 0.39, 1.0), roughness=0.88)
-    mat_stucco = get_or_create_material("Plaster_Stucco", (0.90, 0.87, 0.81, 1.0), roughness=0.85)
-    mat_timber = get_or_create_material("Dark_Timber", (0.24, 0.14, 0.08, 1.0), roughness=0.75)
-    mat_shingles = get_or_create_material("Cedar_Shingles", (0.38, 0.22, 0.14, 1.0), roughness=0.80)
-    mat_shingle_trim = get_or_create_material("Cedar_Shingle_Trim", (0.32, 0.18, 0.11, 1.0), roughness=0.78)
-    mat_planks = get_or_create_material("Wood_Planks", (0.48, 0.32, 0.20, 1.0), roughness=0.70)
-    mat_glass = get_or_create_material("Glass_Window", (0.45, 0.65, 0.75, 1.0), roughness=0.15, metallic=0.1)
-    mat_glass_warm = get_or_create_material("Glass_Lantern_Warm", (0.95, 0.85, 0.45, 1.0), roughness=0.2, metallic=0.0)
-    mat_iron = get_or_create_material("Iron_Metal", (0.12, 0.12, 0.14, 1.0), roughness=0.45, metallic=0.85)
-    mat_leaves = get_or_create_material("Foliage_Green", (0.18, 0.44, 0.16, 1.0), roughness=0.65)
-    mat_flower_red = get_or_create_material("Flower_Red", (0.85, 0.12, 0.12, 1.0), roughness=0.5)
-    mat_flower_yellow = get_or_create_material("Flower_Yellow", (0.92, 0.75, 0.15, 1.0), roughness=0.5)
-    mat_terracotta = get_or_create_material("Terracotta_Pot", (0.68, 0.32, 0.18, 1.0), roughness=0.82)
+    mat_stone = get_or_create_material("Stone_Foundation", (0.36, 0.34, 0.32), roughness=0.92)
+    mat_stone_trim = get_or_create_material("Stone_Trim", (0.44, 0.42, 0.39), roughness=0.88)
+    mat_stucco = get_or_create_material("Plaster_Stucco", (0.90, 0.87, 0.81), roughness=0.85)
+    mat_timber = get_or_create_material("Dark_Timber", (0.24, 0.14, 0.08), roughness=0.75)
+    mat_shingles = get_or_create_material("Cedar_Shingles", (0.38, 0.22, 0.14), roughness=0.80)
+    mat_shingle_trim = get_or_create_material("Cedar_Shingle_Trim", (0.32, 0.18, 0.11), roughness=0.78)
+    mat_planks = get_or_create_material("Wood_Planks", (0.48, 0.32, 0.20), roughness=0.70)
+    # Refined semi-transparent window glass with soft alpine sky-blue tint
+    mat_glass = get_or_create_material("Glass_Window", (0.62, 0.80, 0.88), roughness=0.12, metallic=0.15, alpha=0.55)
+    mat_win_interior = get_or_create_material("Window_Interior_Depth", (0.12, 0.09, 0.06), roughness=0.90)
+    mat_glass_warm = get_or_create_material("Glass_Lantern_Warm", (0.95, 0.85, 0.45), roughness=0.20, metallic=0.0)
+    mat_iron = get_or_create_material("Iron_Metal", (0.12, 0.12, 0.14), roughness=0.45, metallic=0.85)
+    mat_leaves = get_or_create_material("Foliage_Green", (0.18, 0.44, 0.16), roughness=0.65)
+    mat_flower_red = get_or_create_material("Flower_Red", (0.85, 0.12, 0.12), roughness=0.5)
+    mat_flower_yellow = get_or_create_material("Flower_Yellow", (0.92, 0.75, 0.15), roughness=0.5)
+    mat_terracotta = get_or_create_material("Terracotta_Pot", (0.68, 0.32, 0.18), roughness=0.82)
 
     root = bpy.data.objects.new("Farmhouse_Exterior_Root", None)
     bpy.context.collection.objects.link(root)
@@ -81,7 +87,7 @@ def build_farmhouse_exterior():
             create_box(f"CornerPost_{cx}_{cy}", (timber_thick*1.4, timber_thick*1.4, w_h),
                        (cx, cy, base_z + w_h/2), mat_timber, root)
     
-    # Horizontal sill and wall plate beams
+    # Horizontal sill and wall plate beams (Bottom and Top of walls)
     for cy in [-w_d/2, w_d/2]:
         create_box(f"WallBeam_Bottom_{cy}", (w_w, timber_thick, timber_thick), (0, cy, base_z + timber_thick/2), mat_timber, root)
         create_box(f"WallBeam_Top_{cy}", (w_w, timber_thick, timber_thick), (0, cy, base_z + w_h - timber_thick/2), mat_timber, root)
@@ -91,23 +97,24 @@ def build_farmhouse_exterior():
 
     # Intermediate vertical timber studs
     for vx in [-3.8, -1.8, 1.8, 3.8]:
-        create_box(f"Stud_Front_{vx}", (timber_thick, timber_thick*0.8, w_h), (vx, w_d/2 + 0.02, base_z + w_h/2), mat_timber, root)
-        create_box(f"Stud_Back_{vx}", (timber_thick, timber_thick*0.8, w_h), (vx, -w_d/2 - 0.02, base_z + w_h/2), mat_timber, root)
+        create_box(f"Stud_Front_{vx}", (timber_thick, timber_thick*0.8, w_h), (vx, w_d/2 + 0.01, base_z + w_h/2), mat_timber, root)
+        create_box(f"Stud_Back_{vx}", (timber_thick, timber_thick*0.8, w_h), (vx, -w_d/2 - 0.01, base_z + w_h/2), mat_timber, root)
     for vy in [-2.4, 0.0, 2.4]:
-        create_box(f"Stud_SideW_{vy}", (timber_thick*0.8, timber_thick, w_h), (-w_w/2 - 0.02, vy, base_z + w_h/2), mat_timber, root)
-        create_box(f"Stud_SideE_{vy}", (timber_thick*0.8, timber_thick, w_h), (w_w/2 + 0.02, vy, base_z + w_h/2), mat_timber, root)
+        create_box(f"Stud_SideW_{vy}", (timber_thick*0.8, timber_thick, w_h), (-w_w/2 - 0.01, vy, base_z + w_h/2), mat_timber, root)
+        create_box(f"Stud_SideE_{vy}", (timber_thick*0.8, timber_thick, w_h), (w_w/2 + 0.01, vy, base_z + w_h/2), mat_timber, root)
 
-    # Diagonal Fachwerk Corner Braces
-    brace_len = 1.4
-    for bx in [-w_w/2 + 0.6, w_w/2 - 0.6]:
+    # Diagonal Fachwerk Corner Braces (Cleanly joined between posts and top wall plate)
+    brace_len = 1.35
+    brace_ang = math.radians(45)
+    for bx, b_sign_x in [(-w_w/2 + 0.55, 1), (w_w/2 - 0.55, -1)]:
         for by in [-w_d/2, w_d/2]:
-            b_obj = create_box(f"Brace_{bx}_{by}", (brace_len, timber_thick*0.7, timber_thick),
-                               (bx, by + (0.02 if by > 0 else -0.02), base_z + w_h - 0.6), mat_timber, root)
-            b_obj.rotation_euler.y = math.radians(40 if bx < 0 else -40)
+            b_obj = create_box(f"Brace_{bx}_{by}", (brace_len, timber_thick*0.7, timber_thick*0.9),
+                               (bx, by + (0.01 if by > 0 else -0.01), base_z + w_h - 0.55), mat_timber, root)
+            b_obj.rotation_euler.y = brace_ang * (-b_sign_x)
 
     # 4. Front Porch (Veranda)
-    p_w, p_d, p_h = 4.8, 2.4, 0.45
-    p_center_y = w_d/2 + p_d/2
+    p_w, p_d = 4.8, 2.4
+    p_center_y = w_d/2 + p_d/2 # 3.8 + 1.2 = 5.0
     # Porch foundation plinth
     create_box("Porch_Foundation", (p_w, p_d, f_h - 0.05), (0, p_center_y, (f_h - 0.05)/2), mat_stone, root)
     # Porch timber deck
@@ -123,7 +130,7 @@ def build_farmhouse_exterior():
         s_z = (f_h + 0.06) - (step + 1) * step_rise + step_rise/2
         create_box(f"Porch_Step_{step+1}", (s_w, step_run + 0.02, step_rise), (0, s_y, s_z), mat_planks, root)
 
-    # Stair Timber Stringers (side supports)
+    # Stair Timber Stringers (side supports flush with steps)
     stair_total_run = num_steps * step_run
     stair_mid_y = w_d/2 + p_d + stair_total_run/2
     stair_mid_z = (f_h + 0.06)/2
@@ -133,21 +140,44 @@ def build_farmhouse_exterior():
         str_obj = create_box(f"Stair_Stringer_{str_x}", (0.1, stair_len, 0.22), (str_x, stair_mid_y, stair_mid_z), mat_timber, root)
         str_obj.rotation_euler.x = -stair_angle
 
-    # Porch Posts (4 timber posts with chamfered appearance)
+    # Porch Posts (4 chamfered timber posts):
+    # Front posts at outer edge; Back posts flush against house wall!
     post_h = 2.4
-    for px in [-p_w/2 + 0.18, p_w/2 - 0.18]:
-        for py in [w_d/2 + 0.18, w_d/2 + p_d - 0.18]:
-            create_box(f"Porch_Post_{px}_{py}", (0.18, 0.18, post_h), (px, py, f_h + 0.12 + post_h/2), mat_timber, root)
-            # Decorative corner bracket under beam
-            if py > w_d/2 + 0.5:
-                br = create_box(f"Porch_Bracket_{px}_{py}", (0.12, 0.45, 0.45), (px, py - 0.2, f_h + 0.12 + post_h - 0.2), mat_timber, root)
-                br.rotation_euler.x = math.radians(45)
+    post_thick = 0.18
+    front_post_y = w_d/2 + p_d - 0.18 # 6.02
+    back_post_y = w_d/2 + post_thick/2 # 3.89 (Anchored directly to house wall!)
+    for px in [-p_w/2 + 0.18, p_w/2 - 0.18]: # +-2.22
+        # Front Post
+        create_box(f"Porch_Post_{px}_front", (post_thick, post_thick, post_h),
+                   (px, front_post_y, f_h + 0.12 + post_h/2), mat_timber, root)
+        # Back Post / Pilaster (attached to wall)
+        create_box(f"Porch_Post_{px}_back", (post_thick, post_thick, post_h),
+                   (px, back_post_y, f_h + 0.12 + post_h/2), mat_timber, root)
 
-    # Porch Railings
+    # Porch Horizontal Header Beams (connecting all 4 posts in a solid structural frame):
+    header_z = f_h + 0.12 + post_h - post_thick/2 # 3.23
+    # Front header beam
+    create_box("Porch_Header_Front", (p_w - 0.18, post_thick, post_thick),
+               (0, front_post_y, header_z), mat_timber, root)
+    # Side tie beams connecting front posts back to house wall
+    side_tie_len = front_post_y - back_post_y
+    for px in [-p_w/2 + 0.18, p_w/2 - 0.18]:
+        create_box(f"Porch_Header_Side_{px}", (post_thick, side_tie_len, post_thick),
+                   (px, (front_post_y + back_post_y)/2, header_z), mat_timber, root)
+        # Decorative structural brackets between posts and header
+        # Front corner bracket
+        br_front = create_box(f"Porch_Bracket_Front_{px}", (0.12, 0.38, 0.12),
+                              (px, front_post_y - 0.18, header_z - 0.18), mat_timber, root)
+        br_front.rotation_euler.x = math.radians(45)
+        # Wall junction bracket
+        br_back = create_box(f"Porch_Bracket_Back_{px}", (0.12, 0.38, 0.12),
+                             (px, back_post_y + 0.18, header_z - 0.18), mat_timber, root)
+        br_back.rotation_euler.x = math.radians(-45)
+
+    # Porch Railings & Balusters
     for side_x in [-p_w/2 + 0.18, p_w/2 - 0.18]:
         create_box(f"Porch_Rail_Side_{side_x}", (0.08, p_d - 0.35, 0.08), (side_x, p_center_y, f_h + 0.12 + 0.85), mat_timber, root)
         create_box(f"Porch_Bottom_Rail_Side_{side_x}", (0.08, p_d - 0.35, 0.06), (side_x, p_center_y, f_h + 0.12 + 0.12), mat_timber, root)
-        # Balusters
         for b in range(6):
             by = w_d/2 + 0.35 + b * ((p_d - 0.7)/5)
             create_box(f"Baluster_{side_x}_{b}", (0.05, 0.05, 0.72), (side_x, by, f_h + 0.12 + 0.48), mat_timber, root)
@@ -155,29 +185,41 @@ def build_farmhouse_exterior():
     # Front rails (leaving center opening for stairs)
     for fx in [-p_w/4 - s_w/4 - 0.05, p_w/4 + s_w/4 + 0.05]:
         rail_len = (p_w - s_w)/2 - 0.2
-        create_box(f"Porch_Rail_Front_{fx}", (rail_len, 0.08, 0.08), (fx, w_d/2 + p_d - 0.18, f_h + 0.12 + 0.85), mat_timber, root)
-        create_box(f"Porch_Bottom_Rail_Front_{fx}", (rail_len, 0.08, 0.06), (fx, w_d/2 + p_d - 0.18, f_h + 0.12 + 0.12), mat_timber, root)
+        create_box(f"Porch_Rail_Front_{fx}", (rail_len, 0.08, 0.08), (fx, front_post_y, f_h + 0.12 + 0.85), mat_timber, root)
+        create_box(f"Porch_Bottom_Rail_Front_{fx}", (rail_len, 0.08, 0.06), (fx, front_post_y, f_h + 0.12 + 0.12), mat_timber, root)
         for fb in range(3):
             fbx = fx - rail_len/2 + 0.15 + fb * ((rail_len - 0.3)/2)
-            create_box(f"FrontBaluster_{fx}_{fb}", (0.05, 0.05, 0.72), (fbx, w_d/2 + p_d - 0.18, f_h + 0.12 + 0.48), mat_timber, root)
+            create_box(f"FrontBaluster_{fx}_{fb}", (0.05, 0.05, 0.72), (fbx, front_post_y, f_h + 0.12 + 0.48), mat_timber, root)
 
-    # Porch Roof (Pitched lean-to canopy with overhang and rafter ends)
-    p_roof_h = f_h + post_h + 0.18
-    p_roof = create_box("Porch_Roof_Canopy", (p_w + 0.6, p_d + 0.6, 0.14),
-                        (0, p_center_y + 0.15, p_roof_h), mat_shingles, root)
-    p_roof.rotation_euler.x = math.radians(12)
+    # Porch Roof Canopy (Authentic lean-to shed roof shedding rain AWAY from house)
+    # Wall plate anchor at wall (y = 3.8): Z = 3.65.
+    # Front eave at outer edge (y = 6.4): Z = 3.25.
+    p_roof_pitch = -math.atan2(0.40, p_d + 0.4) # Negative pitch slopes down towards +Y
+    p_roof_y = p_center_y + 0.15 # 5.15
+    p_roof_z = 3.48
+    p_roof = create_box("Porch_Roof_Canopy", (p_w + 0.6, p_d + 0.55, 0.12),
+                        (0, p_roof_y, p_roof_z), mat_shingles, root)
+    p_roof.rotation_euler.x = p_roof_pitch
 
-    # Porch Roof Facia / Trim
-    create_box("Porch_Roof_Facia", (p_w + 0.64, 0.08, 0.18), (0, w_d/2 + p_d + 0.45, p_roof_h - 0.16), mat_shingle_trim, root)
+    # Porch Roof Front Facia / Trim (cleanly aligned with slope)
+    p_facia = create_box("Porch_Roof_Facia", (p_w + 0.64, 0.08, 0.16),
+                         (0, w_d/2 + p_d + 0.40, p_roof_z - 0.20), mat_shingle_trim, root)
+    p_facia.rotation_euler.x = p_roof_pitch
 
-    # Hanging Brass Lantern on Porch (Cleanly anchored under front beam, ALL in absolute root coords!)
-    lantern_beam_z = f_h + post_h + 0.06
-    lantern_y = w_d/2 + p_d - 0.25
-    create_box("Lantern_Hanger_Bracket", (0.06, 0.24, 0.18), (0, lantern_y, lantern_beam_z - 0.05), mat_iron, root)
-    create_box("Lantern_Chain", (0.03, 0.03, 0.22), (0, lantern_y, lantern_beam_z - 0.22), mat_iron, root)
-    create_box("Lantern_Cap", (0.26, 0.26, 0.08), (0, lantern_y, lantern_beam_z - 0.35), mat_iron, root)
-    create_box("Porch_Lantern", (0.20, 0.20, 0.30), (0, lantern_y, lantern_beam_z - 0.52), mat_glass_warm, root)
-    create_box("Lantern_Base", (0.24, 0.24, 0.06), (0, lantern_y, lantern_beam_z - 0.69), mat_iron, root)
+    # Porch Exposed Rafters (supporting underside of canopy)
+    for r_idx in range(5):
+        rx = -p_w/2 + 0.3 + r_idx * (p_w - 0.6)/4
+        rafter = create_box(f"Porch_Rafter_{r_idx}", (0.10, p_d + 0.45, 0.10),
+                            (rx, p_roof_y, p_roof_z - 0.10), mat_timber, root)
+        rafter.rotation_euler.x = p_roof_pitch
+
+    # Hanging Brass Lantern on Porch (Cleanly anchored under front header beam)
+    lantern_y = front_post_y
+    create_box("Lantern_Hanger_Bracket", (0.06, 0.20, 0.14), (0, lantern_y, header_z - 0.14), mat_iron, root)
+    create_box("Lantern_Chain", (0.03, 0.03, 0.18), (0, lantern_y, header_z - 0.28), mat_iron, root)
+    create_box("Lantern_Cap", (0.24, 0.24, 0.08), (0, lantern_y, header_z - 0.38), mat_iron, root)
+    create_box("Porch_Lantern", (0.18, 0.18, 0.26), (0, lantern_y, header_z - 0.53), mat_glass_warm, root)
+    create_box("Lantern_Base", (0.22, 0.22, 0.06), (0, lantern_y, header_z - 0.68), mat_iron, root)
 
     # 5. Front Door Recessed Frame & Hinged Door Unit
     door_w, door_h = 1.2, 2.2
@@ -197,48 +239,17 @@ def build_farmhouse_exterior():
     bpy.context.collection.objects.link(door_pivot)
 
     # Door Leaf: child of door_pivot with local X offset of +door_w/2
-    # So its local pivot is at X=0 (the hinge!)
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
-    door_leaf = bpy.context.active_object
-    door_leaf.name = "door_leaf"
-    door_leaf.scale = (door_w - 0.04, 0.08, door_h - 0.04)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    door_leaf.data.materials.append(mat_planks)
-    door_leaf.parent = door_pivot
-    door_leaf.location = ((door_w - 0.04)/2, 0, (door_h - 0.04)/2)
+    door_leaf = create_box("door_leaf", (door_w - 0.04, 0.08, door_h - 0.04),
+                           ((door_w - 0.04)/2, 0, (door_h - 0.04)/2), mat_planks, door_pivot)
 
     # Iron strap hinges (attached to door_pivot so they swing naturally)
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
-    hinge_top = bpy.context.active_object
-    hinge_top.name = "Door_Hinge_Top"
-    hinge_top.scale = (0.35, 0.03, 0.06)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    hinge_top.data.materials.append(mat_iron)
-    hinge_top.parent = door_pivot
-    hinge_top.location = (0.20, 0.05, door_h * 0.8)
-
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
-    hinge_bot = bpy.context.active_object
-    hinge_bot.name = "Door_Hinge_Bottom"
-    hinge_bot.scale = (0.35, 0.03, 0.06)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    hinge_bot.data.materials.append(mat_iron)
-    hinge_bot.parent = door_pivot
-    hinge_bot.location = (0.20, 0.05, door_h * 0.25)
-
-    # Ring Door Handle & Backplate
-    bpy.ops.mesh.primitive_cube_add(size=1.0, location=(0, 0, 0))
-    d_handle = bpy.context.active_object
-    d_handle.name = "Door_Handle"
-    d_handle.scale = (0.08, 0.07, 0.16)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    d_handle.data.materials.append(mat_iron)
-    d_handle.parent = door_pivot
-    d_handle.location = (door_w - 0.16, 0.05, 1.05)
+    create_box("Door_Hinge_Top", (0.35, 0.03, 0.06), (0.20, 0.05, door_h * 0.8), mat_iron, door_pivot)
+    create_box("Door_Hinge_Bottom", (0.35, 0.03, 0.06), (0.20, 0.05, door_h * 0.25), mat_iron, door_pivot)
+    create_box("Door_Handle", (0.08, 0.07, 0.16), (door_w - 0.16, 0.05, 1.05), mat_iron, door_pivot)
 
     # 6. Upper Gable & Steep Pitched Alpine Roof
     ridge_h = 7.4
-    gable_base_z = base_z + w_h
+    gable_base_z = base_z + w_h # 3.6m
 
     # North and South triangular gable walls (using bmesh)
     for g_name, g_y, g_sign in [("Gable_South", w_d/2, 1), ("Gable_North", -w_d/2, -1)]:
@@ -265,11 +276,11 @@ def build_farmhouse_exterior():
         for gbx, gsign_x in [(-w_w/4, 1), (w_w/4, -1)]:
             gb_obj = create_box(f"Gable_Brace_{g_name}_{gbx}", (g_brace_len, 0.12, 0.12),
                                 (gbx, g_y + (0.03 if g_sign > 0 else -0.03), gable_base_z + (ridge_h - gable_base_z)/3), mat_timber, root)
-            gb_obj.rotation_euler.y = gb_ang * gsign_x
+            gb_obj.rotation_euler.y = gb_ang * (-gsign_x)
 
     # Roof Slopes (East slope and West slope with layered shingles)
-    roof_len = w_d + 1.4 # Overhangs on gable ends
-    pitch_angle = math.atan2(ridge_h - gable_base_z, w_w/2 + 0.6)
+    roof_len = w_d + 1.4 # Overhangs on gable ends (9.0m)
+    pitch_angle = math.atan2(ridge_h - gable_base_z, w_w/2 + 0.6) # ~33.2 degrees
     slope_w = math.hypot(w_w/2 + 0.7, ridge_h - gable_base_z)
 
     # East Roof Slope
@@ -287,7 +298,7 @@ def build_farmhouse_exterior():
     for fin_y in [-(roof_len + 0.3)/2, (roof_len + 0.3)/2]:
         create_box(f"Ridge_Finial_{fin_y}", (0.16, 0.16, 0.5), (0, fin_y, ridge_h + 0.4), mat_timber, root)
 
-    # Bargeboards / Vergeboards on Gable Edges
+    # Bargeboards / Vergeboards on Gable Edges (Flush with roof pitch)
     for bb_y, bb_sign in [(-w_d/2 - 0.65, -1), (w_d/2 + 0.65, 1)]:
         b_east = create_box(f"Bargeboard_E_{bb_sign}", (slope_w, 0.10, 0.24),
                             ((w_w/2 + 0.35)/2, bb_y, (gable_base_z + ridge_h)/2 + 0.08), mat_shingle_trim, root)
@@ -296,55 +307,87 @@ def build_farmhouse_exterior():
                             (-(w_w/2 + 0.35)/2, bb_y, (gable_base_z + ridge_h)/2 + 0.08), mat_shingle_trim, root)
         b_west.rotation_euler.y = -pitch_angle
 
-    # Exposed Rafter Tails under eaves
+    # Structural Rafters under eaves (Firmly anchored into wall top plate and extending under roof overhang)
+    rafter_len = 0.95
     for e_idx in range(int(w_d) + 2):
         ry = -w_d/2 - 0.3 + e_idx * 0.8
-        create_box(f"Rafter_E_{e_idx}", (0.55, 0.12, 0.12), (w_w/2 + 0.35, ry, gable_base_z - 0.06), mat_timber, root)
-        create_box(f"Rafter_W_{e_idx}", (0.55, 0.12, 0.12), (-w_w/2 - 0.35, ry, gable_base_z - 0.06), mat_timber, root)
+        # East rafter: anchors from wall at X=5.0 out to X=5.8 under eave
+        r_east_tail = create_box(f"Rafter_E_{e_idx}", (rafter_len, 0.12, 0.12),
+                                 (w_w/2 + 0.20, ry, gable_base_z + 0.08), mat_timber, root)
+        r_east_tail.rotation_euler.y = pitch_angle
+        # West rafter: anchors from wall at X=-5.0 out to X=-5.8 under eave
+        r_west_tail = create_box(f"Rafter_W_{e_idx}", (rafter_len, 0.12, 0.12),
+                                 (-w_w/2 - 0.20, ry, gable_base_z + 0.08), mat_timber, root)
+        r_west_tail.rotation_euler.y = -pitch_angle
 
     # Dormer Window on South Roof Slope (Facing Front Yard)
     d_w, d_d, d_h = 1.6, 1.8, 1.4
     d_y = w_d/4
     d_z = gable_base_z + 0.8
     create_box("Dormer_Body", (d_w, d_d, d_h), (0, d_y, d_z), mat_stucco, root)
-    create_box("Dormer_Window_Frame", (1.1, 0.12, 1.0), (0, d_y + d_d/2 + 0.02, d_z), mat_timber, root)
-    create_box("Dormer_Window_Glass", (0.95, 0.06, 0.85), (0, d_y + d_d/2 + 0.03, d_z), mat_glass, root)
+    create_box("Dormer_Window_Backing", (1.1, 0.06, 1.0), (0, d_y + d_d/2 + 0.01, d_z), mat_win_interior, root)
+    create_box("Dormer_Window_Frame", (1.2, 0.12, 1.1), (0, d_y + d_d/2 + 0.03, d_z), mat_timber, root)
+    create_box("Dormer_Window_Glass", (1.0, 0.04, 0.9), (0, d_y + d_d/2 + 0.04, d_z), mat_glass, root)
+    # Dormer mullions
+    create_box("Dormer_Mullion_V", (0.05, 0.05, 0.9), (0, d_y + d_d/2 + 0.045, d_z), mat_timber, root)
+    create_box("Dormer_Mullion_H", (1.0, 0.05, 0.05), (0, d_y + d_d/2 + 0.045, d_z), mat_timber, root)
     # Dormer peaked roof
     d_roof = create_box("Dormer_Roof", (d_w + 0.35, d_d + 0.35, 0.14), (0, d_y, d_z + d_h/2 + 0.2), mat_shingles, root)
     d_roof.rotation_euler.y = math.radians(18)
 
-    # 7. Ground Floor Windows with Multi-Pane Frames and Cedar Flower Boxes
+    # 7. Ground Floor Windows with Multi-Pane Frames, Depth Backing, and Cedar Flower Boxes
+    # All windows have CORRECT local rotation applied to frame, glass, mullions, and backing!
     win_coords = [
-        (-3.2, w_d/2 + 0.02, base_z + 1.4, 0),
-        (3.2, w_d/2 + 0.02, base_z + 1.4, 0),
-        (-3.2, -w_d/2 - 0.02, base_z + 1.4, math.pi),
-        (3.2, -w_d/2 - 0.02, base_z + 1.4, math.pi),
-        (-w_w/2 - 0.02, 1.4, base_z + 1.4, -math.pi/2),
-        (w_w/2 + 0.02, 1.4, base_z + 1.4, math.pi/2)
+        (-3.2, w_d/2 + 0.02, base_z + 1.4, 0),             # South front left
+        (3.2, w_d/2 + 0.02, base_z + 1.4, 0),              # South front right
+        (-3.2, -w_d/2 - 0.02, base_z + 1.4, math.pi),       # North back left
+        (3.2, -w_d/2 - 0.02, base_z + 1.4, math.pi),        # North back right
+        (-w_w/2 - 0.02, 1.4, base_z + 1.4, -math.pi/2),     # West side
+        (w_w/2 + 0.02, 1.4, base_z + 1.4, math.pi/2)        # East side
     ]
     for idx, (wx, wy, wz, wrot) in enumerate(win_coords):
+        # Window Recess / Depth Backing (gives believable depth into room instead of solid stucco)
+        w_back = create_box(f"Window_Backing_{idx}", (1.3, 0.06, 1.2), (wx, wy, wz), mat_win_interior, root)
+        w_back.rotation_euler.z = wrot
+
+        # Window Outer Casing Frame with projecting sill
         w_obj = create_box(f"Window_Frame_{idx}", (1.4, 0.14, 1.3), (wx, wy, wz), mat_timber, root)
         w_obj.rotation_euler.z = wrot
-        create_box(f"Window_Glass_{idx}", (1.2, 0.04, 1.1), (wx, wy, wz), mat_glass, root)
-        # Window Mullions (cross frame)
-        mullion_v = create_box(f"Mullion_V_{idx}", (0.06, 0.06, 1.1), (wx, wy, wz), mat_timber, root)
+
+        # Window Sill Ledge (classic wooden projecting sill)
+        sill_off_x = 0.07 * math.sin(wrot)
+        sill_off_y = 0.07 * math.cos(wrot)
+        w_sill = create_box(f"Window_Sill_{idx}", (1.52, 0.18, 0.08), (wx + sill_off_x, wy + sill_off_y, wz - 0.65), mat_timber, root)
+        w_sill.rotation_euler.z = wrot
+
+        # Window Glass Pane - ROTATION STRICTLY APPLIED!
+        w_glass = create_box(f"Window_Glass_{idx}", (1.2, 0.03, 1.1), (wx + sill_off_x*0.4, wy + sill_off_y*0.4, wz), mat_glass, root)
+        w_glass.rotation_euler.z = wrot
+
+        # Window Mullions (cross frame) - ROTATION STRICTLY APPLIED!
+        mullion_v = create_box(f"Mullion_V_{idx}", (0.05, 0.05, 1.1), (wx + sill_off_x*0.5, wy + sill_off_y*0.5, wz), mat_timber, root)
         mullion_v.rotation_euler.z = wrot
-        mullion_h = create_box(f"Mullion_H_{idx}", (1.2, 0.06, 0.06), (wx, wy, wz), mat_timber, root)
+        mullion_h = create_box(f"Mullion_H_{idx}", (1.2, 0.05, 0.05), (wx + sill_off_x*0.5, wy + sill_off_y*0.5, wz), mat_timber, root)
         mullion_h.rotation_euler.z = wrot
 
-        # Flower Box under window
-        fbox_off_y = 0.24 if wrot == 0 else (-0.24 if wrot == math.pi else 0)
-        fbox_off_x = 0.24 if wrot == math.pi/2 else (-0.24 if wrot == -math.pi/2 else 0)
-        create_box(f"FlowerBox_{idx}", (1.4, 0.28, 0.26), (wx + fbox_off_x, wy + fbox_off_y, wz - 0.72), mat_planks, root)
+        # Cedar Flower Box under window
+        fbox_dist = 0.25
+        fbox_off_x = fbox_dist * math.sin(wrot)
+        fbox_off_y = fbox_dist * math.cos(wrot)
+        fbox = create_box(f"FlowerBox_{idx}", (1.4, 0.28, 0.26), (wx + fbox_off_x, wy + fbox_off_y, wz - 0.72), mat_planks, root)
+        fbox.rotation_euler.z = wrot
 
         # Blooming flowers & greenery in box
-        create_box(f"FlowerFoliage_{idx}", (1.3, 0.24, 0.16), (wx + fbox_off_x*0.9, wy + fbox_off_y*0.9, wz - 0.62), mat_leaves, root)
+        fol = create_box(f"FlowerFoliage_{idx}", (1.3, 0.24, 0.16), (wx + fbox_off_x*0.9, wy + fbox_off_y*0.9, wz - 0.62), mat_leaves, root)
+        fol.rotation_euler.z = wrot
         for fl_idx in range(6):
-            fl_x = wx + (fl_idx - 2.5) * 0.20 if (wrot == 0 or wrot == math.pi) else wx
-            fl_y = wy + (fl_idx - 2.5) * 0.20 if (wrot == math.pi/2 or wrot == -math.pi/2) else wy
+            step_pos = (fl_idx - 2.5) * 0.20
+            fl_x = wx + fbox_off_x*0.9 + step_pos * math.cos(wrot)
+            fl_y = wy + fbox_off_y*0.9 - step_pos * math.sin(wrot)
             fl_mat = mat_flower_red if fl_idx % 2 == 0 else mat_flower_yellow
-            create_box(f"Flower_{idx}_{fl_idx}", (0.12, 0.12, 0.14),
-                       (fl_x + fbox_off_x*0.9, fl_y + fbox_off_y*0.9, wz - 0.52), fl_mat, root)
+            fl_obj = create_box(f"Flower_{idx}_{fl_idx}", (0.12, 0.12, 0.14),
+                                (fl_x, fl_y, wz - 0.52), fl_mat, root)
+            fl_obj.rotation_euler.z = wrot
 
     # 8. Massive Fieldstone Chimney on East Wall
     chim_w, chim_d = 1.4, 1.4
@@ -353,7 +396,6 @@ def build_farmhouse_exterior():
     chim_h = ridge_h + 1.0 # Protrudes well above ridge peak
     create_box("Chimney_Plinth", (chim_w + 0.3, chim_d + 0.3, 1.2), (chim_x, chim_y, 0.6), mat_stone, root)
     create_box("Chimney_Breast", (chim_w, chim_d, chim_h - 1.2), (chim_x, chim_y, 1.2 + (chim_h - 1.2)/2), mat_stone, root)
-    # Stepped shoulder
     create_box("Chimney_Shoulder", (chim_w + 0.15, chim_d + 0.15, 0.18), (chim_x, chim_y, gable_base_z + 0.5), mat_stone_trim, root)
     create_box("Chimney_Crown", (chim_w + 0.25, chim_d + 0.25, 0.22), (chim_x, chim_y, chim_h + 0.11), mat_stone_trim, root)
     create_box("Chimney_Flue_Pot", (0.55, 0.55, 0.50), (chim_x, chim_y, chim_h + 0.45), mat_terracotta, root)
@@ -364,27 +406,47 @@ def build_farmhouse_exterior():
     smoke_empty.parent = root
     bpy.context.collection.objects.link(smoke_empty)
 
-    # 9. Attached Woodshed on West Wall
+    # 9. Attached Woodshed on West Wall (Built with authentic timber post-and-beam frame, open slats)
     shed_w, shed_d, shed_h = 3.2, 4.2, 2.3
     shed_x = -w_w/2 - shed_w/2
     shed_y = -0.5
-    create_box("Woodshed_Frame", (shed_w, shed_d, shed_h), (shed_x, shed_y, shed_h/2 + f_h/2), mat_timber, root)
-    create_box("Woodshed_Sill", (shed_w + 0.1, shed_d + 0.1, 0.15), (shed_x, shed_y, f_h/2 + 0.08), mat_stone, root)
-    # Slanted lean-to roof
-    shed_roof = create_box("Woodshed_Roof", (shed_w + 0.5, shed_d + 0.5, 0.12), (shed_x, shed_y, f_h/2 + shed_h + 0.15), mat_shingles, root)
+    # Stone Sill Foundation
+    create_box("Woodshed_Sill", (shed_w + 0.1, shed_d + 0.1, 0.18), (shed_x, shed_y, f_h/2 + 0.09), mat_stone, root)
+    
+    # Woodshed Corner Posts and Top Plates (Authentic open timber structure)
+    for sp_x in [shed_x - shed_w/2 + 0.1, shed_x + shed_w/2 - 0.1]:
+        for sp_y in [shed_y - shed_d/2 + 0.1, shed_y + shed_d/2 - 0.1]:
+            create_box(f"Woodshed_Post_{sp_x}_{sp_y}", (0.16, 0.16, shed_h),
+                       (sp_x, sp_y, f_h/2 + 0.18 + shed_h/2), mat_timber, root)
+    # Top plate timber
+    create_box("Woodshed_TopPlate_Outer", (0.16, shed_d, 0.16),
+               (shed_x - shed_w/2 + 0.1, shed_y, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+    create_box("Woodshed_TopPlate_Front", (shed_w, 0.16, 0.16),
+               (shed_x, shed_y + shed_d/2 - 0.1, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+    create_box("Woodshed_TopPlate_Back", (shed_w, 0.16, 0.16),
+               (shed_x, shed_y - shed_d/2 + 0.1, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+
+    # Outer wall timber slats (weatherboards with small gaps)
+    for slat in range(6):
+        slat_z = f_h/2 + 0.35 + slat * (shed_h - 0.5)/5
+        create_box(f"Woodshed_Slat_Outer_{slat}", (0.06, shed_d - 0.2, 0.18),
+                   (shed_x - shed_w/2 + 0.08, shed_y, slat_z), mat_planks, root)
+
+    # Slanted lean-to roof (anchored firmly to main house wall)
+    shed_roof = create_box("Woodshed_Roof", (shed_w + 0.5, shed_d + 0.5, 0.12),
+                           (shed_x, shed_y, f_h/2 + shed_h + 0.15), mat_shingles, root)
     shed_roof.rotation_euler.y = math.radians(-14)
 
-    # Stacked firewood logs inside shed
+    # Stacked firewood logs inside shed (fully visible through open front/end)
     for log_row in range(4):
         for log_col in range(6):
             lx = shed_x - shed_w/4 + (log_col - 2.5) * 0.24
             ly = shed_y + (log_row % 2) * 0.08
-            lz = f_h/2 + 0.2 + log_row * 0.26
+            lz = f_h/2 + 0.22 + log_row * 0.26
             create_box(f"Firewood_{log_row}_{log_col}", (0.2, 1.2, 0.2), (lx, ly, lz), mat_planks, root)
 
     # 10. Embedded Dedicated Collision Proxies (-col suffix)
     create_box("foundation-col", (f_w, f_d, f_h), (0, 0, f_h/2), None, root)
-    # Walls with doorway gap
     wall_col_thick = 0.35
     create_box("wall_north-col", (w_w, wall_col_thick, w_h), (0, -w_d/2, base_z + w_h/2), None, root)
     create_box("wall_east-col", (wall_col_thick, w_d, w_h), (w_w/2, 0, base_z + w_h/2), None, root)
@@ -395,8 +457,7 @@ def build_farmhouse_exterior():
     create_box("wall_south_left-col", (left_w, wall_col_thick, w_h), (-w_w/2 + left_w/2, w_d/2, base_z + w_h/2), None, root)
     create_box("wall_south_right-col", (left_w, wall_col_thick, w_h), (w_w/2 - left_w/2, w_d/2, base_z + w_h/2), None, root)
     
-    # Porch deck collision (extends only to front edge of porch, NOT covering the stairs)
-    # Stair ascent is handled smoothly by CollisionWorld.addRamp() in Three.js
+    # Porch deck collision
     create_box("porch_deck-col", (p_w, p_d, f_h + 0.1), (0, p_center_y, (f_h + 0.1)/2), None, root)
     create_box("chimney-col", (chim_w, chim_d, chim_h), (chim_x, chim_y, chim_h/2), None, root)
     create_box("shed-col", (shed_w, shed_d, shed_h), (shed_x, shed_y, shed_h/2 + f_h/2), None, root)

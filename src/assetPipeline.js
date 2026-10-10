@@ -130,6 +130,16 @@ export class AssetPipeline {
   tuneMaterial(mat) {
     if (!mat) return;
     mat.dithering = true;
+    const name = (mat.name || '').toLowerCase();
+    if (name.includes('glass') || name.includes('window')) {
+      mat.transparent = true;
+      mat.opacity = 0.55;
+      mat.roughness = 0.12;
+      mat.metalness = 0.18;
+      mat.depthWrite = false;
+      mat.needsUpdate = true;
+      return;
+    }
     if (mat.roughness !== undefined && mat.roughness < 0.2) {
       mat.roughness = 0.45;
     }

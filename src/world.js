@@ -541,14 +541,14 @@ export class World {
       this.scene.add(group);
     };
 
-    // 1. DISTANT ALPINE RANGES (pushed back to 115m - 145m, framing the sky gracefully)
-    // North Range (magnificent panoramic backdrop behind Farmhouse)
+    // 1. DISTANT ALPINE RANGES (pushed back to 115m - 160m, framing the sky gracefully)
+    // North Range (magnificent panoramic backdrop safely behind Farmhouse estate)
     const northMassifs = [
-      { x: -95, z: -125, r: 58, h: 36, yaw: 0.3, sx: 1.4, sz: 0.9 },
-      { x: -50, z: -138, r: 64, h: 40, yaw: 0.8, sx: 1.3, sz: 1.0 },
-      { x: -5,  z: -142, r: 68, h: 42, yaw: 0.2, sx: 1.5, sz: 0.9 },
-      { x: 42,  z: -136, r: 62, h: 39, yaw: 1.1, sx: 1.3, sz: 1.0 },
-      { x: 88,  z: -126, r: 56, h: 35, yaw: 0.5, sx: 1.4, sz: 0.9 }
+      { x: -95, z: -145, r: 58, h: 38, yaw: 0.3, sx: 1.4, sz: 0.8 },
+      { x: -50, z: -155, r: 64, h: 42, yaw: 0.8, sx: 1.3, sz: 0.8 },
+      { x: -5,  z: -160, r: 68, h: 44, yaw: 0.2, sx: 1.5, sz: 0.8 },
+      { x: 42,  z: -152, r: 62, h: 41, yaw: 1.1, sx: 1.3, sz: 0.8 },
+      { x: 88,  z: -145, r: 56, h: 37, yaw: 0.5, sx: 1.4, sz: 0.8 }
     ];
     northMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
 
@@ -580,12 +580,12 @@ export class World {
     ];
     eastMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
 
-    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (at 85m - 98m, lower and darker)
+    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (pushed cleanly behind northern perimeter)
     const midCrags = [
-      { x: -62, z: -88, r: 42, h: 26, yaw: 0.4, sx: 1.3, sz: 0.9 },
-      { x: -22, z: -94, r: 44, h: 27, yaw: 0.8, sx: 1.2, sz: 1.0 },
-      { x: 24,  z: -92, r: 43, h: 26, yaw: 0.2, sx: 1.3, sz: 0.9 },
-      { x: 64,  z: -86, r: 40, h: 25, yaw: 1.0, sx: 1.2, sz: 1.0 },
+      { x: -62, z: -108, r: 38, h: 28, yaw: 0.4, sx: 1.2, sz: 0.8 },
+      { x: -22, z: -114, r: 40, h: 29, yaw: 0.8, sx: 1.2, sz: 0.8 },
+      { x: 24,  z: -112, r: 40, h: 28, yaw: 0.2, sx: 1.2, sz: 0.8 },
+      { x: 64,  z: -106, r: 38, h: 27, yaw: 1.0, sx: 1.2, sz: 0.8 },
       { x: -88, z: -25, r: 40, h: 25, yaw: 1.5, sx: 0.9, sz: 1.2 },
       { x: -88, z: 35,  r: 40, h: 24, yaw: 1.6, sx: 0.9, sz: 1.2 },
       { x: 88,  z: -25, r: 40, h: 25, yaw: 1.5, sx: 0.9, sz: 1.2 },
@@ -593,17 +593,18 @@ export class World {
     ];
     midCrags.forEach(mc => createSweepingMountain(mc.x, mc.z, mc.r, mc.h, mc.yaw, mc.sx, mc.sz, rockMid, false));
 
-    // 3. ROLLING ALPINE FOOTHILLS (gentle green mounds connecting valley floor to mountains)
+    // 3. ROLLING ALPINE FOOTHILLS (gentle green mounds naturally skirting valley perimeter)
     for (let f = 0; f < 18; f++) {
       const angle = (f / 18) * Math.PI * 2;
-      const dist = 66 + (f % 2) * 6;
+      const isNorth = Math.sin(angle) < -0.15;
+      const dist = isNorth ? 82 + (f % 2) * 6 : 66 + (f % 2) * 6;
       const fx = Math.cos(angle) * dist;
       const fz = Math.sin(angle) * dist;
-      const fr = 26 + (f % 3) * 4;
+      const fr = isNorth ? 22 + (f % 3) * 3 : 26 + (f % 3) * 4;
       const fh = 12 + (f % 2) * 4;
 
       const hillGeo = new THREE.ConeGeometry(fr, fh, 7);
-      hillGeo.scale(1.2, 1.0, 0.9);
+      hillGeo.scale(1.1, 1.0, isNorth ? 0.75 : 0.9);
       const hillMesh = new THREE.Mesh(hillGeo, foothillMat);
       hillMesh.position.set(fx, fh / 2, fz);
       hillMesh.rotation.y = angle + 0.3;
