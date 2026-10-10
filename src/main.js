@@ -530,6 +530,22 @@ if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(14.0, 1.30, -3.8));
   player.yaw = -0.92;
   player.pitch = 0.10;
+} else if (urlParams.get('cam') === 'orchard-wide') {
+  player.respawn(new THREE.Vector3(13.5, 3.4, -18.0));
+  player.yaw = -1.20;
+  player.pitch = -0.20;
+} else if (urlParams.get('cam') === 'orchard-row') {
+  player.respawn(new THREE.Vector3(14.5, 1.35, -8.0));
+  player.yaw = -0.80;
+  player.pitch = 0.08;
+} else if (urlParams.get('cam') === 'west-grove') {
+  player.respawn(new THREE.Vector3(-21.0, 1.40, -4.0));
+  player.yaw = 2.40;
+  player.pitch = 0.06;
+} else if (urlParams.get('cam') === 'apple-branch') {
+  player.respawn(new THREE.Vector3(19.8, 1.48, -5.4));
+  player.yaw = -0.74;
+  player.pitch = 0.50;
 }
 
 const timeParam = urlParams.get('time');

@@ -1334,15 +1334,9 @@ export class World {
    */
   buildFacetedTrees() {
     const trunkMat = this.materials.trunk;
-    const leafDeep = this.materials.leafDeep;
-    const leafMid = this.materials.leafVibrant;
-    const leafSun = this.materials.leafSun;
-    const leafLight = this.materials.leafLight;
-    const appleMat = this.materials.apple;
-    const appleStemMat = this.materials.appleStem;
 
-    // 1. CHARACTERFUL BRANCHING APPLE TREES (East Orchard & West Grove)
-    // Naturally staggered, organic orchard placement with picturesque spacing
+    // 1. BLENDER STYLIZED APPLE ORCHARD & HERITAGE GROVE (12 Trees)
+    // Upgraded from procedural spheres to high-fidelity Blender 3D models with branch-anchored fruit development
     const orchardLocations = [
       // East Orchard Rows (along East Orchard Lane)
       { x: 19.5, z: -17.8, h: 3.4, rot: 0.2 },
@@ -1360,214 +1354,55 @@ export class World {
       { x: -28.0, z: 8.5,   h: 3.4, rot: 1.2 }
     ];
 
+    const pseudoRand = (seed) => {
+      const s = Math.sin(seed) * 10000;
+      return s - Math.floor(s);
+    };
+
+    // Synchronously initialize all 12 tree groups, colliders, and interactables
     orchardLocations.forEach((loc, tIndex) => {
-      // PROOF OF CONCEPT: Tree index 3 (at x=20.2, z=-6.2) uses the Blender-modeled apple tree
-      if (tIndex === 3) {
-        const treeGroup = new THREE.Group();
-        treeGroup.position.set(loc.x, 0, loc.z);
-        treeGroup.rotation.y = loc.rot || 0;
-        this.scene.add(treeGroup);
-
-        const trunkH = loc.h || 3.5;
-        const trunkRadius = 0.44;
-        this.world.addCylinderCollider(loc.x, loc.z, trunkRadius, trunkH);
-        const trunkBox = new THREE.Box3(
-          new THREE.Vector3(loc.x - trunkRadius, 0, loc.z - trunkRadius),
-          new THREE.Vector3(loc.x + trunkRadius, trunkH, loc.z + trunkRadius)
-        );
-        this.world.colliders.push({ box: trunkBox, mesh: treeGroup, type: 'solid', isCylinder: true });
-
-        const fruits = [];
-        for (let fIndex = 0; fIndex < 4; fIndex++) {
-          const fruitObj = {
-            id: `apple_tree_${tIndex}_fruit_${fIndex}`,
-            mesh: null,
-            name: `Apple Tree #${tIndex + 1} (Blender Model)`,
-            prompt: 'Pick Apple',
-            ready: true,
-            growTimer: 0,
-            regrowTime: 15.0,
-            baseY: 2.0,
-            interact: (player) => {
-              if (!fruitObj.ready) return;
-              fruitObj.ready = false;
-              fruitObj.growTimer = fruitObj.regrowTime;
-              if (fruitObj.mesh) fruitObj.mesh.scale.set(0.05, 0.05, 0.05);
-
-              player.addToBackpack('apple', 1);
-              sounds.playInteract();
-
-              events.emit('crop:harvested', { type: 'apple', id: fruitObj.id });
-
-              const evt = new CustomEvent('game:message', {
-                detail: { message: '🍎 Picked 1 Crisp Orchard Apple!' }
-              });
-              window.dispatchEvent(evt);
-            },
-            update: (dt) => {
-              if (!fruitObj.ready) {
-                fruitObj.growTimer -= dt;
-                const progress = 1 - (fruitObj.growTimer / fruitObj.regrowTime);
-                const scale = Math.min(1.0, 0.05 + progress * 0.95);
-                if (fruitObj.mesh) fruitObj.mesh.scale.set(scale, scale, scale);
-
-                if (fruitObj.growTimer <= 0) {
-                  fruitObj.ready = true;
-                  if (fruitObj.mesh) fruitObj.mesh.scale.set(1, 1, 1);
-                }
-              }
-            }
-          };
-          fruits.push(fruitObj);
-          this.interactables.push(fruitObj);
-        }
-
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.load('/models/apple_tree.glb', (gltf) => {
-          const blenderModel = gltf.scene;
-          blenderModel.traverse(child => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-          });
-          treeGroup.add(blenderModel);
-
-          // Connect apple fruit meshes so scaling and raycasting interact correctly
-          for (let fIndex = 0; fIndex < 4; fIndex++) {
-            const appleMeshNode = blenderModel.getObjectByName(`Apple_${fIndex}`);
-            if (appleMeshNode) {
-              fruits[fIndex].mesh = appleMeshNode;
-              if (!fruits[fIndex].ready) {
-                appleMeshNode.scale.set(0.05, 0.05, 0.05);
-              }
-            }
-          }
-        });
-
-        this.fruitTrees.push({ group: treeGroup, canopy: null, fruits, phaseOffset: loc.x * 0.5 + loc.z * 0.5 });
-        return;
-      }
-
       const treeGroup = new THREE.Group();
       treeGroup.position.set(loc.x, 0, loc.z);
-      treeGroup.rotation.y = loc.rot || 0;
+      
+      // Controlled procedural yaw rotation
+      const yawVar = (loc.rot || 0) + (pseudoRand(tIndex * 31.7 + 5.2) - 0.5) * 0.6;
+      treeGroup.rotation.y = yawVar;
+      this.scene.add(treeGroup);
 
-      const trunkH = loc.h || 3.4;
-      // Smooth organic trunk with realistic taper (16 radial segments, smooth shading)
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.52, trunkH, 16), trunkMat);
-      trunk.position.set(0, trunkH / 2, 0);
-      trunk.castShadow = true;
-      trunk.receiveShadow = true;
-      treeGroup.add(trunk);
+      // Controlled procedural scale variation (0.90 - 1.12)
+      const scaleVar = 0.90 + pseudoRand(tIndex * 19.3 + 1.7) * 0.22;
+      const trunkH = (loc.h || 3.4) * scaleVar;
+      const trunkRadius = 0.44 * scaleVar;
 
-      // Flared organic root base where trunk meets meadow soil
-      const rootBase = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.74, 0.45, 16), trunkMat);
-      rootBase.position.set(0, 0.22, 0);
-      rootBase.receiveShadow = true;
-      treeGroup.add(rootBase);
-
-      // Smooth branching limbs reaching into the canopy
-      const branchG = new THREE.CylinderGeometry(0.18, 0.26, 1.8, 12);
-      const b1 = new THREE.Mesh(branchG, trunkMat);
-      b1.position.set(0.55, trunkH - 0.2, 0.4);
-      b1.rotation.z = -0.65;
-      b1.rotation.y = 0.5;
-      treeGroup.add(b1);
-
-      const b2 = new THREE.Mesh(branchG, trunkMat);
-      b2.position.set(-0.55, trunkH - 0.3, -0.4);
-      b2.rotation.z = 0.65;
-      b2.rotation.y = -0.5;
-      treeGroup.add(b2);
-
-      // Accurate radial cylinder collider + matching AABB
-      const trunkRadius = 0.44;
+      // Solid collision cylinder matching scaled tree base
       this.world.addCylinderCollider(loc.x, loc.z, trunkRadius, trunkH);
       const trunkBox = new THREE.Box3(
         new THREE.Vector3(loc.x - trunkRadius, 0, loc.z - trunkRadius),
         new THREE.Vector3(loc.x + trunkRadius, trunkH, loc.z + trunkRadius)
       );
-      this.world.colliders.push({ box: trunkBox, mesh: trunk, type: 'solid', isCylinder: true });
+      this.world.colliders.push({ box: trunkBox, mesh: treeGroup, type: 'solid', isCylinder: true });
 
-      // Smooth Billowing Cloud Foliage (Smooth Spheres with layered tones - zero blocky facets!)
-      const canopyGroup = new THREE.Group();
-      canopyGroup.position.set(0, trunkH, 0);
-
-      // Deep shadow base cluster
-      const baseClump = new THREE.Mesh(new THREE.SphereGeometry(2.35, 20, 16), leafDeep);
-      baseClump.position.set(0, 1.25, 0);
-      baseClump.castShadow = true;
-      baseClump.receiveShadow = true;
-      canopyGroup.add(baseClump);
-
-      // Mid vibrant body clusters
-      const midClump1 = new THREE.Mesh(new THREE.SphereGeometry(1.85, 20, 16), leafMid);
-      midClump1.position.set(0.9, 1.65, 0.45);
-      midClump1.castShadow = true;
-      canopyGroup.add(midClump1);
-
-      const midClump2 = new THREE.Mesh(new THREE.SphereGeometry(1.75, 20, 16), leafMid);
-      midClump2.position.set(-0.9, 1.55, -0.45);
-      midClump2.castShadow = true;
-      canopyGroup.add(midClump2);
-
-      const midClump3 = new THREE.Mesh(new THREE.SphereGeometry(1.65, 20, 16), leafLight);
-      midClump3.position.set(-0.35, 1.7, 0.85);
-      midClump3.castShadow = true;
-      canopyGroup.add(midClump3);
-
-      // Sun-kissed top crest cluster
-      const topClump = new THREE.Mesh(new THREE.SphereGeometry(1.5, 20, 16), leafSun);
-      topClump.position.set(0.2, 2.5, -0.15);
-      topClump.castShadow = true;
-      canopyGroup.add(topClump);
-
-      treeGroup.add(canopyGroup);
-      this.scene.add(treeGroup);
-
-      // Ripe Red Apples hanging at player picking height (1.85m - 2.15m)
+      // 4 branch-anchored apple interactables per tree (total 48 fruit interactables)
       const fruits = [];
-      const fruitOffsets = [
-        { x: -1.3, y: 2.05, z: 0.8 },
-        { x: 1.2, y: 1.95, z: -0.85 },
-        { x: -0.85, y: 2.15, z: -1.1 },
-        { x: 1.35, y: 1.9, z: 0.75 }
-      ];
-
-      fruitOffsets.forEach((fo, fIndex) => {
-        const appleGroup = new THREE.Group();
-        appleGroup.position.set(loc.x + fo.x, fo.y, loc.z + fo.z);
-
-        const appleMesh = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 12), appleMat);
-        appleMesh.castShadow = true;
-        appleGroup.add(appleMesh);
-
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 6), trunkMat);
-        stem.position.set(0, 0.22, 0);
-        appleGroup.add(stem);
-
-        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.1, 5), appleStemMat);
-        leaf.position.set(0.05, 0.22, 0);
-        leaf.rotation.z = 0.6;
-        appleGroup.add(leaf);
-
-        this.scene.add(appleGroup);
-
+      for (let fIndex = 0; fIndex < 4; fIndex++) {
         const fruitObj = {
           id: `apple_tree_${tIndex}_fruit_${fIndex}`,
-          mesh: appleGroup,
+          mesh: null,
           name: `Apple Tree #${tIndex + 1}`,
           prompt: 'Pick Apple',
           ready: true,
           growTimer: 0,
           regrowTime: 15.0,
-          baseY: fo.y,
+          pluckTimer: 0,
+          baseY: 2.0 * scaleVar,
           interact: (player) => {
             if (!fruitObj.ready) return;
             fruitObj.ready = false;
             fruitObj.growTimer = fruitObj.regrowTime;
-            appleGroup.scale.set(0.05, 0.05, 0.05);
+            fruitObj.pluckTimer = 0.2; // 200ms harvest pluck
+            if (fruitObj.mesh) {
+              fruitObj.mesh.scale.set(0.05, 0.05, 0.05);
+            }
 
             player.addToBackpack('apple', 1);
             sounds.playInteract();
@@ -1582,24 +1417,155 @@ export class World {
           update: (dt) => {
             if (!fruitObj.ready) {
               fruitObj.growTimer -= dt;
-              const progress = 1 - (fruitObj.growTimer / fruitObj.regrowTime);
-              const scale = Math.min(1.0, 0.05 + progress * 0.95);
-              appleGroup.scale.set(scale, scale, scale);
+
+              if (fruitObj.pluckTimer > 0) {
+                fruitObj.pluckTimer -= dt;
+                const pluckProgress = Math.max(0, fruitObj.pluckTimer / 0.2);
+                const pluckScale = pluckProgress * 0.05;
+                if (fruitObj.mesh) {
+                  if (pluckScale <= 0.005) {
+                    fruitObj.mesh.visible = false;
+                  } else {
+                    fruitObj.mesh.visible = true;
+                    fruitObj.mesh.scale.set(pluckScale, pluckScale, pluckScale);
+                  }
+                }
+              } else {
+                const progress = 1 - (fruitObj.growTimer / fruitObj.regrowTime);
+                if (progress <= 0.04) {
+                  // Clean harvested state: no detached stem floating in air
+                  if (fruitObj.mesh) fruitObj.mesh.visible = false;
+                } else {
+                  // Branch-anchored regrowth: smoothly expands outward from branch spur
+                  const smoothP = progress * progress * (3 - 2 * progress);
+                  const budScale = 0.08;
+                  const currentScale = Math.min(1.0, budScale + smoothP * (1.0 - budScale));
+                  if (fruitObj.mesh) {
+                    fruitObj.mesh.visible = true;
+                    fruitObj.mesh.scale.set(currentScale, currentScale, currentScale);
+                  }
+                }
+              }
 
               if (fruitObj.growTimer <= 0) {
                 fruitObj.ready = true;
-                appleGroup.scale.set(1, 1, 1);
+                fruitObj.growTimer = 0;
+                fruitObj.pluckTimer = 0;
+                if (fruitObj.mesh) {
+                  fruitObj.mesh.visible = true;
+                  fruitObj.mesh.scale.set(1, 1, 1);
+                }
               }
             }
           }
         };
-
         fruits.push(fruitObj);
         this.interactables.push(fruitObj);
+      }
+
+      this.fruitTrees.push({
+        group: treeGroup,
+        canopy: null,
+        fruits,
+        scaleVar,
+        phaseOffset: loc.x * 0.5 + loc.z * 0.5
+      });
+    });
+
+    // Single-pass GLTF loader: load master model once and clone across all 12 trees
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/apple_tree.glb', (gltf) => {
+      // Configure shadow properties on base meshes
+      gltf.scene.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
       });
 
-      this.fruitTrees.push({ group: treeGroup, canopy: canopyGroup, fruits, phaseOffset: loc.x * 0.5 + loc.z * 0.5 });
+      // Extract foliage materials to build subtle shared tone palettes
+      const baseLeafMats = {};
+      gltf.scene.traverse(child => {
+        if (child.isMesh && child.material && child.material.name.startsWith('Mat_Leaf')) {
+          baseLeafMats[child.material.name] = child.material;
+        }
+      });
+
+      const createTintedPalette = (hShift, sShift, lShift) => {
+        const pal = {};
+        for (const [name, mat] of Object.entries(baseLeafMats)) {
+          const m = mat.clone();
+          m.color = mat.color.clone().offsetHSL(hShift, sShift, lShift);
+          pal[name] = m;
+        }
+        return pal;
+      };
+
+      const foliagePalettes = [
+        baseLeafMats,                             // Palette 0: Natural lush orchard green
+        createTintedPalette(0.012, 0.04, 0.015),  // Palette 1: Sun-kissed golden green
+        createTintedPalette(-0.018, 0.03, -0.01), // Palette 2: Deep alpine emerald
+        createTintedPalette(0.008, 0.05, 0.008)   // Palette 3: Fresh spring lime
+      ];
+
+      // Attach cloned Blender model to all 12 orchard tree groups
+      this.fruitTrees.forEach((treeData, tIdx) => {
+        if (tIdx >= orchardLocations.length) return;
+
+        const treeModel = gltf.scene.clone(true);
+        treeModel.scale.set(treeData.scaleVar, treeData.scaleVar, treeData.scaleVar);
+
+        // Assign foliage palette for organic orchard color diversity
+        const chosenPalette = foliagePalettes[tIdx % 4];
+        const canopyNode = treeModel.getObjectByName('Canopy');
+        if (canopyNode) {
+          treeData.canopy = canopyNode;
+          canopyNode.children.forEach((cluster, cIdx) => {
+            // Procedural canopy cluster micro-variations for unique tree silhouettes
+            const cScale = 0.92 + pseudoRand(tIdx * 29 + cIdx * 7.3) * 0.16;
+            cluster.scale.set(cScale, cScale, cScale);
+            cluster.position.x += (pseudoRand(tIdx * 13 + cIdx * 5.1) - 0.5) * 0.10;
+            cluster.position.z += (pseudoRand(tIdx * 17 + cIdx * 3.7) - 0.5) * 0.10;
+          });
+        }
+
+        treeModel.traverse(child => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material && chosenPalette[child.material.name]) {
+              child.material = chosenPalette[child.material.name];
+            }
+          }
+        });
+
+        // Link apple nodes for interactive picking and branch-anchored regrowth
+        for (let fIndex = 0; fIndex < 4; fIndex++) {
+          const appleNode = treeModel.getObjectByName(`Apple_${fIndex}`);
+          if (appleNode) {
+            treeData.fruits[fIndex].mesh = appleNode;
+            if (!treeData.fruits[fIndex].ready) {
+              const progress = 1 - (treeData.fruits[fIndex].growTimer / treeData.fruits[fIndex].regrowTime);
+              if (progress <= 0.04) {
+                appleNode.visible = false;
+              } else {
+                const smoothP = progress * progress * (3 - 2 * progress);
+                const budScale = 0.08;
+                const currentScale = Math.min(1.0, budScale + smoothP * (1.0 - budScale));
+                appleNode.visible = true;
+                appleNode.scale.set(currentScale, currentScale, currentScale);
+              }
+            } else {
+              appleNode.visible = true;
+              appleNode.scale.set(1, 1, 1);
+            }
+          }
+        }
+
+        treeData.group.add(treeModel);
+      });
     });
+
 
     // 2. SLENDER BIRCH TREES
     // Grouped into picturesque natural copses framing knolls and meadows
@@ -2073,12 +2039,24 @@ export class World {
               const state = savedFruits[fruit.id];
               fruit.ready = !!state.ready;
               fruit.growTimer = typeof state.growTimer === 'number' ? state.growTimer : 0;
+              fruit.pluckTimer = 0;
               if (!fruit.ready) {
                 const progress = 1 - (fruit.growTimer / fruit.regrowTime);
-                const scale = Math.min(1.0, 0.05 + Math.max(0, progress) * 0.95);
-                fruit.mesh.scale.set(scale, scale, scale);
+                if (progress <= 0.04) {
+                  if (fruit.mesh) fruit.mesh.visible = false;
+                } else {
+                  const smoothP = progress * progress * (3 - 2 * progress);
+                  const scale = Math.min(1.0, 0.08 + Math.max(0, smoothP) * 0.92);
+                  if (fruit.mesh) {
+                    fruit.mesh.visible = true;
+                    fruit.mesh.scale.set(scale, scale, scale);
+                  }
+                }
               } else {
-                fruit.mesh.scale.set(1, 1, 1);
+                if (fruit.mesh) {
+                  fruit.mesh.visible = true;
+                  fruit.mesh.scale.set(1, 1, 1);
+                }
               }
             }
           });
