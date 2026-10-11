@@ -64,15 +64,16 @@ def build_farmhouse_exterior():
     root = bpy.data.objects.new("Farmhouse_Exterior_Root", None)
     bpy.context.collection.objects.link(root)
 
-    # 1. Fieldstone Foundation Plinth (10.6 x 7.8 x 0.8m)
+    # 1. Fieldstone Foundation Plinth (10.6 x 7.8m with subterranean skirt down to -0.8m)
     f_w, f_d, f_h = 10.6, 7.8, 0.8
-    create_box("Foundation_Plinth", (f_w, f_d, f_h), (0, 0, f_h/2), mat_stone, root)
+    skirt_depth = 0.8
+    create_box("Foundation_Plinth", (f_w, f_d, f_h + skirt_depth), (0, 0, (f_h - skirt_depth)/2), mat_stone, root)
     create_box("Foundation_Coping", (f_w + 0.18, f_d + 0.18, 0.12), (0, 0, f_h - 0.06), mat_stone_trim, root)
 
-    # Foundation Corner Quoins (chiseled stone corners)
+    # Foundation Corner Quoins (chiseled stone corners with subterranean footing)
     for qx in [-f_w/2, f_w/2]:
         for qy in [-f_d/2, f_d/2]:
-            create_box(f"Foundation_Quoin_{qx}_{qy}", (0.5, 0.5, f_h + 0.02), (qx, qy, f_h/2), mat_stone_trim, root)
+            create_box(f"Foundation_Quoin_{qx}_{qy}", (0.5, 0.5, f_h + skirt_depth + 0.02), (qx, qy, (f_h - skirt_depth)/2 + 0.01), mat_stone_trim, root)
 
     # 2. Main Ground Floor Walls (Stucco Body: 10.4 x 7.6 x 2.8m, above foundation)
     w_w, w_d, w_h = 10.4, 7.6, 2.8
@@ -115,12 +116,12 @@ def build_farmhouse_exterior():
     # 4. Front Porch (Veranda)
     p_w, p_d = 4.8, 2.4
     p_center_y = w_d/2 + p_d/2 # 3.8 + 1.2 = 5.0
-    # Porch foundation plinth
-    create_box("Porch_Foundation", (p_w, p_d, f_h - 0.05), (0, p_center_y, (f_h - 0.05)/2), mat_stone, root)
+    # Porch foundation plinth extending down to subterranean depth
+    create_box("Porch_Foundation", (p_w, p_d, f_h - 0.05 + skirt_depth), (0, p_center_y, (f_h - 0.05 - skirt_depth)/2), mat_stone, root)
     # Porch timber deck
     create_box("Porch_Deck", (p_w + 0.25, p_d + 0.15, 0.12), (0, p_center_y, f_h + 0.06), mat_planks, root)
 
-    # Porch stairs (5 full steps reaching all the way from deck at Z=0.86 down to ground at Z=0)
+    # Porch stairs (5 full steps reaching from deck at Z=0.86 down to ground at Z=0)
     s_w = 1.8
     num_steps = 5
     step_rise = (f_h + 0.06) / num_steps # ~0.172m per step
@@ -139,6 +140,10 @@ def build_farmhouse_exterior():
     for str_x in [-s_w/2 - 0.06, s_w/2 + 0.06]:
         str_obj = create_box(f"Stair_Stringer_{str_x}", (0.1, stair_len, 0.22), (str_x, stair_mid_y, stair_mid_z), mat_timber, root)
         str_obj.rotation_euler.x = -stair_angle
+
+    # Subterranean stone stair bed under steps anchoring them securely into the ground
+    create_box("Stair_Bed", (s_w + 0.4, stair_total_run + 0.2, skirt_depth + 0.08),
+               (0, stair_mid_y, -skirt_depth/2 + 0.04), mat_stone, root)
 
     # Porch Posts (4 chamfered timber posts):
     # Front posts at outer edge; Back posts flush against house wall!
@@ -394,7 +399,7 @@ def build_farmhouse_exterior():
     chim_x = w_w/2 + chim_w/2 - 0.2
     chim_y = -1.2
     chim_h = ridge_h + 1.0 # Protrudes well above ridge peak
-    create_box("Chimney_Plinth", (chim_w + 0.3, chim_d + 0.3, 1.2), (chim_x, chim_y, 0.6), mat_stone, root)
+    create_box("Chimney_Plinth", (chim_w + 0.3, chim_d + 0.3, 1.2 + skirt_depth), (chim_x, chim_y, 0.6 - skirt_depth/2), mat_stone, root)
     create_box("Chimney_Breast", (chim_w, chim_d, chim_h - 1.2), (chim_x, chim_y, 1.2 + (chim_h - 1.2)/2), mat_stone, root)
     create_box("Chimney_Shoulder", (chim_w + 0.15, chim_d + 0.15, 0.18), (chim_x, chim_y, gable_base_z + 0.5), mat_stone_trim, root)
     create_box("Chimney_Crown", (chim_w + 0.25, chim_d + 0.25, 0.22), (chim_x, chim_y, chim_h + 0.11), mat_stone_trim, root)
@@ -410,39 +415,42 @@ def build_farmhouse_exterior():
     shed_w, shed_d, shed_h = 3.2, 4.2, 2.3
     shed_x = -w_w/2 - shed_w/2
     shed_y = -0.5
-    # Stone Sill Foundation
-    create_box("Woodshed_Sill", (shed_w + 0.1, shed_d + 0.1, 0.18), (shed_x, shed_y, f_h/2 + 0.09), mat_stone, root)
+    # Solid stone foundation plinth extending from subterranean skirt up to shed floor level
+    shed_f_h = 0.50 + skirt_depth
+    create_box("Woodshed_Foundation", (shed_w + 0.2, shed_d + 0.2, shed_f_h), (shed_x, shed_y, (0.50 - skirt_depth)/2), mat_stone, root)
+    create_box("Woodshed_Sill", (shed_w + 0.1, shed_d + 0.1, 0.18), (shed_x, shed_y, 0.50 + 0.09), mat_stone_trim, root)
     
+    shed_post_base_z = 0.59
     # Woodshed Corner Posts and Top Plates (Authentic open timber structure)
     for sp_x in [shed_x - shed_w/2 + 0.1, shed_x + shed_w/2 - 0.1]:
         for sp_y in [shed_y - shed_d/2 + 0.1, shed_y + shed_d/2 - 0.1]:
             create_box(f"Woodshed_Post_{sp_x}_{sp_y}", (0.16, 0.16, shed_h),
-                       (sp_x, sp_y, f_h/2 + 0.18 + shed_h/2), mat_timber, root)
+                       (sp_x, sp_y, shed_post_base_z + shed_h/2), mat_timber, root)
     # Top plate timber
     create_box("Woodshed_TopPlate_Outer", (0.16, shed_d, 0.16),
-               (shed_x - shed_w/2 + 0.1, shed_y, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+               (shed_x - shed_w/2 + 0.1, shed_y, shed_post_base_z + shed_h - 0.08), mat_timber, root)
     create_box("Woodshed_TopPlate_Front", (shed_w, 0.16, 0.16),
-               (shed_x, shed_y + shed_d/2 - 0.1, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+               (shed_x, shed_y + shed_d/2 - 0.1, shed_post_base_z + shed_h - 0.08), mat_timber, root)
     create_box("Woodshed_TopPlate_Back", (shed_w, 0.16, 0.16),
-               (shed_x, shed_y - shed_d/2 + 0.1, f_h/2 + 0.18 + shed_h - 0.08), mat_timber, root)
+               (shed_x, shed_y - shed_d/2 + 0.1, shed_post_base_z + shed_h - 0.08), mat_timber, root)
 
     # Outer wall timber slats (weatherboards with small gaps)
     for slat in range(6):
-        slat_z = f_h/2 + 0.35 + slat * (shed_h - 0.5)/5
+        slat_z = shed_post_base_z + 0.20 + slat * (shed_h - 0.5)/5
         create_box(f"Woodshed_Slat_Outer_{slat}", (0.06, shed_d - 0.2, 0.18),
                    (shed_x - shed_w/2 + 0.08, shed_y, slat_z), mat_planks, root)
 
     # Slanted lean-to roof (anchored firmly to main house wall)
     shed_roof = create_box("Woodshed_Roof", (shed_w + 0.5, shed_d + 0.5, 0.12),
-                           (shed_x, shed_y, f_h/2 + shed_h + 0.15), mat_shingles, root)
+                           (shed_x, shed_y, shed_post_base_z + shed_h + 0.05), mat_shingles, root)
     shed_roof.rotation_euler.y = math.radians(-14)
 
-    # Stacked firewood logs inside shed (fully visible through open front/end)
+    # Stacked firewood logs inside shed (resting on stone foundation floor)
     for log_row in range(4):
         for log_col in range(6):
             lx = shed_x - shed_w/4 + (log_col - 2.5) * 0.24
             ly = shed_y + (log_row % 2) * 0.08
-            lz = f_h/2 + 0.22 + log_row * 0.26
+            lz = shed_post_base_z + 0.12 + log_row * 0.26
             create_box(f"Firewood_{log_row}_{log_col}", (0.2, 1.2, 0.2), (lx, ly, lz), mat_planks, root)
 
     # 10. Embedded Dedicated Collision Proxies (-col suffix)

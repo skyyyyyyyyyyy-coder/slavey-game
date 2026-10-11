@@ -1039,26 +1039,7 @@ export class World {
       const paddockGroup = new THREE.Group();
       paddockGroup.position.set(x, 0, z);
 
-      // Clean leveled arable soil bed
-      const soilBed = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), soilMat);
-      soilBed.position.set(0, 0.025, 0);
-      soilBed.receiveShadow = true;
-      paddockGroup.add(soilBed);
-
-      // Clean longitudinal furrow slats (crisp, aligned 1x1m grid aesthetic, no awkward bloated geometry)
-      const furrowCount = 5;
-      const furrowSpacing = (d - 1.6) / (furrowCount - 1);
-      const furrowGeo = new THREE.BoxGeometry(w - 1.2, 0.02, 0.28);
-      const furrowMat = new THREE.MeshStandardMaterial({ color: 0x4a2e16, roughness: 0.95 });
-      for (let f = 0; f < furrowCount; f++) {
-        const fZ = -d / 2 + 0.8 + f * furrowSpacing;
-        const furrow = new THREE.Mesh(furrowGeo, furrowMat);
-        furrow.position.set(0, 0.05, fZ);
-        furrow.receiveShadow = true;
-        paddockGroup.add(furrow);
-      }
-
-      // Split-rail fencing with open gate
+      // Split-rail fencing with open gate enclosing the natural arable paddock
       const postGeo = new THREE.CylinderGeometry(0.1, 0.12, 1.1, 7);
       const railGeoX = new THREE.BoxGeometry(w / 2 - 1.2, 0.1, 0.08);
       const railGeoZ = new THREE.BoxGeometry(0.08, 0.1, d - 0.4);
@@ -1095,20 +1076,16 @@ export class World {
 
     // 1. WEST CARROT FIELD at (-16, -14)
     buildPaddock(-16, -14, 14, 10, 'Carrot Patch', '🥕');
-    this.createCarrotCrop(-16, -14, 14, 10, 'carrot_patch');
 
     // 2. EAST PUMPKIN FIELD at (16, -14)
     buildPaddock(16, -14, 14, 10, 'Pumpkin Patch', '🎃');
-    this.createPumpkinCrop(16, -14, 14, 10);
 
     // 3. SOUTH-WEST GOLDEN WHEAT at (-16, 16)
     buildPaddock(-16, 16, 14, 10, 'Golden Wheat', '🌾');
-    this.createWheatCrop(-16, 16, 14, 10);
     this.createScarecrow(-16, 16);
 
     // 4. SOUTH-EAST VEGETABLE GARDEN at (16, 16)
     buildPaddock(16, 16, 14, 10, 'Kitchen Garden', '🥕');
-    this.createCarrotCrop(16, 16, 14, 10, 'kitchen_garden');
   }
 
   createScarecrow(x, z) {
@@ -1273,267 +1250,9 @@ export class World {
     this.scene.add(scGroup);
   }
 
-  createCarrotCrop(centerX, centerZ, width, depth, prefix = 'carrot') {
-    const carrotTopMat = this.materials.leafLight;
-    const carrotMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.5, flatShading: true });
-
-    const rows = 4;
-    const cols = 5;
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = centerX - width / 2 + 1.6 + c * ((width - 3.2) / (cols - 1));
-        const z = centerZ - depth / 2 + 1.4 + r * ((depth - 2.8) / (rows - 1));
-
-        const group = new THREE.Group();
-        group.position.set(x, 0.22, z);
-
-        const root = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.38, 7), carrotMat);
-        root.rotation.x = Math.PI;
-        root.position.set(0, 0.12, 0);
-        root.castShadow = true;
-        group.add(root);
-
-        const foliageGroup = new THREE.Group();
-        for (let l = 0; l < 6; l++) {
-          const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.48, 5), carrotTopMat);
-          leaf.position.set(0, 0.28, 0);
-          leaf.rotation.z = 0.22 + (l % 2) * 0.1;
-          leaf.rotation.y = l * (Math.PI / 3);
-          leaf.castShadow = true;
-          foliageGroup.add(leaf);
-        }
-        group.add(foliageGroup);
-
-        this.scene.add(group);
-
-        const cropObj = {
-          id: `${prefix}_${r}_${c}`,
-          mesh: group,
-          foliage: foliageGroup,
-          name: 'Carrot Plant',
-          prompt: 'Harvest Carrot',
-          ready: true,
-          growTimer: 0,
-          regrowTime: 12.0,
-          phaseOffset: x * 0.7 + z * 0.5,
-          interact: (player) => {
-            if (!cropObj.ready) return;
-            cropObj.ready = false;
-            cropObj.growTimer = cropObj.regrowTime;
-            group.scale.set(0.1, 0.1, 0.1);
-
-            player.addToBackpack('carrot', 1);
-            sounds.playInteract();
-
-            events.emit('crop:harvested', { type: 'carrot', id: cropObj.id });
-
-            const evt = new CustomEvent('game:message', {
-              detail: { message: '🥕 Harvested 1 Sweet Farm Carrot!' }
-            });
-            window.dispatchEvent(evt);
-          },
-          update: (dt) => {
-            if (!cropObj.ready) {
-              cropObj.growTimer -= dt;
-              const progress = 1 - (cropObj.growTimer / cropObj.regrowTime);
-              const scale = Math.min(1.0, 0.1 + progress * 0.9);
-              group.scale.set(scale, scale, scale);
-
-              if (cropObj.growTimer <= 0) {
-                cropObj.ready = true;
-                group.scale.set(1, 1, 1);
-              }
-            }
-          }
-        };
-
-        this.cropPlants.push(cropObj);
-        this.interactables.push(cropObj);
-        this.animatedFoliage.push(cropObj);
-      }
-    }
-  }
-
-  createPumpkinCrop(centerX, centerZ, width, depth) {
-    const pumpkinMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.55, flatShading: true });
-    const stemMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8, flatShading: true });
-    const leafMat = this.materials.leafVibrant;
-
-    const rows = 3;
-    const cols = 4;
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = centerX - width / 2 + 1.8 + c * ((width - 3.6) / (cols - 1)) + (Math.random() - 0.5) * 0.3;
-        const z = centerZ - depth / 2 + 1.6 + r * ((depth - 3.2) / (rows - 1)) + (Math.random() - 0.5) * 0.3;
-
-        const group = new THREE.Group();
-        group.position.set(x, 0.22, z);
-
-        const bodyGroup = new THREE.Group();
-        // Segmented organic pumpkin with ribbed appearance
-        const mainSphere = new THREE.Mesh(new THREE.SphereGeometry(0.44, 16, 12), pumpkinMat);
-        mainSphere.scale.set(1.18, 0.76, 1.18);
-        mainSphere.position.set(0, 0.32, 0);
-        mainSphere.castShadow = true;
-        bodyGroup.add(mainSphere);
-
-        // Fluted ribbed side lobes
-        for (let lobe = 0; lobe < 6; lobe++) {
-          const lMesh = new THREE.Mesh(new THREE.SphereGeometry(0.24, 10, 8), pumpkinMat);
-          const lang = (lobe / 6) * Math.PI * 2;
-          lMesh.scale.set(0.65, 1.05, 0.65);
-          lMesh.position.set(Math.cos(lang) * 0.34, 0.32, Math.sin(lang) * 0.34);
-          bodyGroup.add(lMesh);
-        }
-
-        // Vine leaves sprawled along soil
-        for (let pl = 0; pl < 4; pl++) {
-          const pLeaf = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.02, 6), leafMat);
-          const lang = (pl / 4) * Math.PI * 2;
-          pLeaf.position.set(Math.cos(lang) * 0.46, 0.04, Math.sin(lang) * 0.46);
-          pLeaf.rotation.y = lang;
-          bodyGroup.add(pLeaf);
-        }
-
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.055, 0.22, 6), stemMat);
-        stem.position.set(0.03, 0.66, 0);
-        stem.rotation.z = 0.25;
-        bodyGroup.add(stem);
-
-        group.add(bodyGroup);
-        this.scene.add(group);
-
-        const cropObj = {
-          id: `pumpkin_${r}_${c}`,
-          mesh: group,
-          body: bodyGroup,
-          name: 'Pumpkin Patch',
-          prompt: 'Harvest Pumpkin',
-          ready: true,
-          growTimer: 0,
-          regrowTime: 16.0,
-          phaseOffset: x * 0.6 + z * 0.4,
-          interact: (player) => {
-            if (!cropObj.ready) return;
-            cropObj.ready = false;
-            cropObj.growTimer = cropObj.regrowTime;
-            group.scale.set(0.1, 0.1, 0.1);
-
-            player.addToBackpack('pumpkin', 1);
-            sounds.playInteract();
-
-            events.emit('crop:harvested', { type: 'pumpkin', id: cropObj.id });
-
-            const evt = new CustomEvent('game:message', {
-              detail: { message: '🎃 Harvested 1 Large Ripe Pumpkin!' }
-            });
-            window.dispatchEvent(evt);
-          },
-          update: (dt) => {
-            if (!cropObj.ready) {
-              cropObj.growTimer -= dt;
-              const progress = 1 - (cropObj.growTimer / cropObj.regrowTime);
-              const scale = Math.min(1.0, 0.1 + progress * 0.9);
-              group.scale.set(scale, scale, scale);
-
-              if (cropObj.growTimer <= 0) {
-                cropObj.ready = true;
-                group.scale.set(1, 1, 1);
-              }
-            }
-          }
-        };
-
-        this.cropPlants.push(cropObj);
-        this.interactables.push(cropObj);
-      }
-    }
-  }
-
-  createWheatCrop(centerX, centerZ, width, depth) {
-    const wheatMat = this.materials.straw;
-
-    const rows = 4;
-    const cols = 5;
-
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = centerX - width / 2 + 1.5 + c * ((width - 3.0) / (cols - 1));
-        const z = centerZ - depth / 2 + 1.5 + r * ((depth - 3.0) / (rows - 1));
-
-        const group = new THREE.Group();
-        group.position.set(x, 0.22, z);
-
-        const sheafGroup = new THREE.Group();
-        for (let s = 0; s < 6; s++) {
-          const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.95, 5), wheatMat);
-          const angle = (s / 6) * Math.PI * 2;
-          const tilt = 0.08 + (s % 2) * 0.04;
-          stalk.position.set(Math.cos(angle) * 0.1, 0.47, Math.sin(angle) * 0.1);
-          stalk.rotation.z = Math.cos(angle) * tilt;
-          stalk.rotation.x = Math.sin(angle) * tilt;
-          stalk.castShadow = true;
-          sheafGroup.add(stalk);
-
-          const ear = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.25, 5), wheatMat);
-          ear.position.set(Math.cos(angle) * 0.15, 0.95, Math.sin(angle) * 0.15);
-          ear.rotation.z = Math.cos(angle) * (tilt + 0.15);
-          ear.castShadow = true;
-          sheafGroup.add(ear);
-        }
-        group.add(sheafGroup);
-
-        this.scene.add(group);
-
-        const cropObj = {
-          id: `wheat_${r}_${c}`,
-          mesh: group,
-          foliage: sheafGroup,
-          name: 'Wheat Stalks',
-          prompt: 'Harvest Wheat',
-          ready: true,
-          growTimer: 0,
-          regrowTime: 14.0,
-          phaseOffset: x * 0.8 + z * 0.6,
-          interact: (player) => {
-            if (!cropObj.ready) return;
-            cropObj.ready = false;
-            cropObj.growTimer = cropObj.regrowTime;
-            group.scale.set(0.1, 0.1, 0.1);
-
-            player.addToBackpack('wheat', 1);
-            sounds.playInteract();
-
-            events.emit('crop:harvested', { type: 'wheat', id: cropObj.id });
-
-            const evt = new CustomEvent('game:message', {
-              detail: { message: '🌾 Harvested 1 Golden Wheat Bundle!' }
-            });
-            window.dispatchEvent(evt);
-          },
-          update: (dt) => {
-            if (!cropObj.ready) {
-              cropObj.growTimer -= dt;
-              const progress = 1 - (cropObj.growTimer / cropObj.regrowTime);
-              const scale = Math.min(1.0, 0.1 + progress * 0.9);
-              group.scale.set(scale, scale, scale);
-
-              if (cropObj.growTimer <= 0) {
-                cropObj.ready = true;
-                group.scale.set(1, 1, 1);
-              }
-            }
-          }
-        };
-
-        this.cropPlants.push(cropObj);
-        this.interactables.push(cropObj);
-        this.animatedFoliage.push(cropObj);
-      }
-    }
-  }
+  createCarrotCrop(centerX, centerZ, width, depth, prefix = 'carrot') {}
+  createPumpkinCrop(centerX, centerZ, width, depth) {}
+  createWheatCrop(centerX, centerZ, width, depth) {}
 
   /**
    * Smooth Stylized Trees: Characterful Branching Apple Trees,
@@ -1774,181 +1493,133 @@ export class World {
     });
 
 
-    // 2. SLENDER BIRCH TREES
-    // Picturesque natural copses with organic tapered trunks and weeping layered foliage
+    // 2. HANDCRAFTED BLENDER SLENDER BIRCH TREES
+    // Picturesque natural copses with sweeping trunks, lenticels, and weeping foliage
     const birchLocations = [
       // Terrace hillside copses (framing chalet knoll)
-      { x: -16.5, z: -27.0, h: 5.2 },
-      { x: -19.5, z: -29.5, h: 4.8 },
-      { x: 16.5,  z: -27.0, h: 5.0 },
-      { x: 19.5,  z: -29.5, h: 5.4 },
-      // Scenic northern forest knoll copses (repositioned in front of boundary wall)
-      { x: -14.0, z: -39.5, h: 5.3 },
-      { x: -17.5, z: -40.5, h: 4.7 },
-      { x: 14.0,  z: -39.5, h: 5.1 },
-      { x: 18.0,  z: -40.5, h: 5.5 },
-      // West well plaza shaded copse
-      { x: -22.5, z: -7.0,  h: 4.9 },
-      { x: -25.0, z: -9.5,  h: 5.2 },
-      // South meadow entrance framing copse
-      { x: -18.5, z: 27.0,  h: 5.0 },
-      { x: 18.5,  z: 27.0,  h: 5.2 }
+      { x: -16.5, z: -26.0, scale: 1.05 },
+      { x: 16.5,  z: -26.0, scale: 1.05 },
+      { x: -14.0, z: -35.0, scale: 0.95 },
+      { x: 14.0,  z: -35.0, scale: 0.95 },
+      // Shaded copse near stone well plaza (clear of well radius 2.6m and road)
+      { x: -22.5, z: -3.0,  scale: 1.00 },
+      { x: -24.0, z: 2.0,   scale: 0.95 },
+      // Meadow groves (framing vistas)
+      { x: -18.5, z: 27.0,  scale: 1.00 },
+      { x: 18.5,  z: 27.0,  scale: 1.00 },
+      { x: 36.0,  z: -22.0, scale: 1.05 },
+      { x: 36.0,  z: 14.0,  scale: 0.95 }
     ];
 
-    birchLocations.forEach(bl => {
+    birchLocations.forEach((bl, bIdx) => {
       const bGroup = new THREE.Group();
       bGroup.position.set(bl.x, 0, bl.z);
-
-      const bTrunkH = bl.h || 5.0;
-
-      // Naturally curved organic slender birch trunk (3 connected tapered segments)
-      const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 1.8, 12), this.materials.birchTrunk);
-      seg1.position.set(0, 0.9, 0);
-      seg1.castShadow = true;
-      bGroup.add(seg1);
-
-      const seg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 1.7, 12), this.materials.birchTrunk);
-      seg2.position.set(0.06, 2.55, 0.04);
-      seg2.rotation.z = -0.05;
-      seg2.castShadow = true;
-      bGroup.add(seg2);
-
-      const seg3 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, 1.6, 12), this.materials.birchTrunk);
-      seg3.position.set(0.12, 4.05, 0.08);
-      seg3.rotation.z = 0.06;
-      seg3.castShadow = true;
-      bGroup.add(seg3);
-
-      // Stylized birch lenticel rings & dark markings
-      for (let r = 0; r < 6; r++) {
-        const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.17 - r * 0.015, 0.17 - r * 0.015, 0.06, 12), this.materials.birchSpots);
-        ring.position.set(0.02 * r, 0.6 + r * 0.7, 0.01 * r);
-        bGroup.add(ring);
-      }
-
-      // 3 graceful secondary branches
-      const branchGeo = new THREE.CylinderGeometry(0.04, 0.07, 1.3, 8);
-      const br1 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
-      br1.position.set(-0.35, 3.4, 0.1);
-      br1.rotation.z = 0.75;
-      br1.rotation.y = 0.4;
-      bGroup.add(br1);
-
-      const br2 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
-      br2.position.set(0.42, 3.8, -0.15);
-      br2.rotation.z = -0.7;
-      br2.rotation.y = -0.5;
-      bGroup.add(br2);
-
-      const br3 = new THREE.Mesh(branchGeo, this.materials.birchTrunk);
-      br3.position.set(0.05, 4.4, 0.38);
-      br3.rotation.x = -0.7;
-      bGroup.add(br3);
-
-      // Layered weeping birch foliage fronds (flattened drooping ellipsoidal masses with natural sway)
-      const weepingFoliage = [
-        { x: -0.65, y: 3.4, z: 0.2, sx: 1.1, sy: 0.65, sz: 1.0, mat: this.materials.birchLeaf },
-        { x: 0.75, y: 3.8, z: -0.2, sx: 1.2, sy: 0.7, sz: 1.1, mat: this.materials.birchLeaf },
-        { x: 0.1, y: 4.4, z: 0.65, sx: 1.0, sy: 0.65, sz: 1.0, mat: this.materials.leafSun },
-        { x: -0.25, y: 4.8, z: -0.3, sx: 1.3, sy: 0.75, sz: 1.2, mat: this.materials.birchLeaf },
-        { x: 0.2, y: 5.5, z: 0.1, sx: 1.1, sy: 0.7, sz: 1.0, mat: this.materials.leafSun },
-        { x: 0.0, y: 6.1, z: 0.0, sx: 0.8, sy: 0.6, sz: 0.8, mat: this.materials.leafSun }
-      ];
-
-      weepingFoliage.forEach(wf => {
-        const cluster = new THREE.Mesh(new THREE.SphereGeometry(1.0, 14, 10), wf.mat);
-        cluster.scale.set(wf.sx, wf.sy, wf.sz);
-        cluster.position.set(wf.x, wf.y, wf.z);
-        cluster.castShadow = true;
-        cluster.receiveShadow = true;
-        bGroup.add(cluster);
-      });
-
+      const rotY = (pseudoRand(bIdx * 37.1 + 8.4) - 0.5) * Math.PI * 2;
+      bGroup.rotation.y = rotY;
       this.scene.add(bGroup);
 
-      // Accurate radial cylinder collider + matching AABB
-      const bRadius = 0.26;
+      const bTrunkH = 5.8 * bl.scale;
+      const bRadius = 0.28 * bl.scale;
+
+      // Solid collision cylinder matching birch base
       this.world.addCylinderCollider(bl.x, bl.z, bRadius, bTrunkH);
       const bBox = new THREE.Box3(
         new THREE.Vector3(bl.x - bRadius, 0, bl.z - bRadius),
         new THREE.Vector3(bl.x + bRadius, bTrunkH, bl.z + bRadius)
       );
-      this.world.colliders.push({ box: bBox, mesh: seg1, type: 'solid', isCylinder: true });
+      this.world.colliders.push({ box: bBox, mesh: bGroup, type: 'solid', isCylinder: true });
+
+      // Asynchronously instantiate Blender Birch model
+      assetPipeline.loadModel('/models/tree_birch.glb', { collision: 'none' }).then(res => {
+        if (res && res.model) {
+          const m = res.model.clone(true);
+          m.scale.set(bl.scale, bl.scale, bl.scale);
+          m.traverse(c => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          bGroup.add(m);
+        }
+      }).catch(err => {
+        console.warn('⚠️ [World] Failed to load tree_birch.glb:', err);
+      });
     });
 
-    // 3. TIERED ALPINE PINES / FIRS
+    // 3. HANDCRAFTED BLENDER TIERED ALPINE SPRUCE TREES
     // Dense, layered evergreen forest belt naturally framing valley perimeter
-    const pineLocations = [
-      // North mountain boundary forest (repositioned in front of rock wall at z=-42.5)
-      { x: -28, z: -41.2, h: 8.5 }, { x: -22, z: -41.5, h: 9.2 }, { x: -15, z: -41.0, h: 7.8 },
-      { x: 0,   z: -41.2, h: 9.0 }, { x: 15,  z: -41.0, h: 8.0 }, { x: 22,  z: -41.4, h: 9.5 }, { x: 28, z: -41.2, h: 8.2 },
-      // East foothill forest belt (in front of east wall at x=48.0)
-      { x: 44, z: -30, h: 8.0 }, { x: 46, z: -22, h: 9.0 }, { x: 45, z: -12, h: 7.6 },
-      { x: 46, z: 2,   h: 8.8 }, { x: 44, z: 14,  h: 7.9 }, { x: 46, z: 26,  h: 8.5 },
-      // South valley entrance woodlands (in front of south wall at z=46.0)
-      { x: -32, z: 44.5, h: 8.2 }, { x: -24, z: 45.0, h: 9.0 }, { x: -14, z: 44.0, h: 7.5 },
-      { x: 14,  z: 44.0, h: 7.8 }, { x: 24,  z: 45.0, h: 9.2 }, { x: 32,  z: 44.5, h: 8.4 },
-      // West garden & ridge forest belt (in front of west wall at x=-48.0)
-      { x: -44, z: -28, h: 8.2 }, { x: -46, z: -18, h: 9.1 }, { x: -45, z: -6,  h: 7.8 },
-      { x: -46, z: 8,   h: 8.7 }, { x: -44, z: 20,  h: 7.9 }, { x: -46, z: 32,  h: 8.6 }
+    const spruceLocations = [
+      // North Mountain Forest Belt (Behind & flanking farmhouse knoll with safe breathing room)
+      { x: -32.0, z: -41.0, scale: 1.05 },
+      { x: -25.0, z: -41.5, scale: 1.10 },
+      { x: -18.0, z: -42.0, scale: 0.95 },
+      { x: 0.0,   z: -42.5, scale: 1.15 },
+      { x: 18.0,  z: -42.0, scale: 0.95 },
+      { x: 25.0,  z: -41.5, scale: 1.10 },
+      { x: 32.0,  z: -41.0, scale: 1.05 },
+
+      // East Foothill Forest (flanking east valley ridge)
+      { x: 44.0, z: -32.0, scale: 1.00 },
+      { x: 45.0, z: -24.0, scale: 1.10 },
+      { x: 44.0, z: -14.0, scale: 0.95 },
+      { x: 45.0, z: 0.0,   scale: 1.05 },
+      { x: 44.0, z: 12.0,  scale: 0.90 },
+      { x: 45.0, z: 24.0,  scale: 1.05 },
+      { x: 44.0, z: 35.0,  scale: 1.00 },
+
+      // South Valley Entrance Woodlands (framing south meadow approach)
+      { x: -32.0, z: 43.5, scale: 1.05 },
+      { x: -24.0, z: 44.0, scale: 1.10 },
+      { x: -15.0, z: 43.5, scale: 0.95 },
+      { x: 15.0,  z: 43.5, scale: 0.95 },
+      { x: 24.0,  z: 44.0, scale: 1.10 },
+      { x: 32.0,  z: 43.5, scale: 1.05 },
+
+      // West Ridge Forest (flanking west ridge)
+      { x: -44.0, z: -30.0, scale: 1.00 },
+      { x: -45.0, z: -20.0, scale: 1.05 },
+      { x: -44.0, z: -8.0,  scale: 0.95 },
+      { x: -45.0, z: 6.0,   scale: 1.05 },
+      { x: -44.0, z: 18.0,  scale: 0.95 },
+      { x: -45.0, z: 29.0,  scale: 1.10 },
+      { x: -44.0, z: 39.0,  scale: 1.00 }
     ];
 
-    pineLocations.forEach(p => {
+    spruceLocations.forEach((p, pIdx) => {
       const pineGroup = new THREE.Group();
       pineGroup.position.set(p.x, 0, p.z);
-
-      const pTrunkH = p.h || 7.5;
-      // Rugged tapered conifer trunk
-      const pTrunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.48, pTrunkH, 14), trunkMat);
-      pTrunk.position.set(0, pTrunkH / 2, 0);
-      pTrunk.castShadow = true;
-      pineGroup.add(pTrunk);
-
-      // Root flares at base
-      for (let rf = 0; rf < 4; rf++) {
-        const flare = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.7, 5), trunkMat);
-        const ang = (rf / 4) * Math.PI * 2;
-        flare.position.set(Math.cos(ang) * 0.42, 0.35, Math.sin(ang) * 0.42);
-        flare.rotation.z = Math.cos(ang) * 0.25;
-        flare.rotation.x = Math.sin(ang) * 0.25;
-        pineGroup.add(flare);
-      }
-
-      // 5 crisp faceted tiers of needle boughs with alternating faceted skirts and shadow skirts
-      const tiers = 5;
-      for (let tier = 0; tier < tiers; tier++) {
-        const tierProgress = tier / (tiers - 1);
-        const tierH = 2.2 - tierProgress * 0.6;
-        const tierR = 2.8 - tierProgress * 1.5;
-        const tierY = 2.6 + tier * 1.35;
-
-        // Faceted skirt cone
-        const bough = new THREE.Mesh(new THREE.ConeGeometry(tierR, tierH, 10), tierProgress > 0.6 ? this.materials.leafSun : this.materials.leafPine);
-        bough.scale.set(1.15, 0.75, 1.15);
-        bough.position.set(0, tierY, 0);
-        bough.rotation.y = tier * 0.45;
-        bough.castShadow = true;
-        bough.receiveShadow = true;
-        pineGroup.add(bough);
-
-        // Underside needle shadow skirt
-        const underSkirt = new THREE.Mesh(new THREE.ConeGeometry(tierR * 0.92, 0.3, 10), this.materials.leafDeep);
-        underSkirt.scale.set(1.1, 0.6, 1.1);
-        underSkirt.position.set(0, tierY - tierH * 0.25, 0);
-        underSkirt.rotation.y = tier * 0.45 + 0.2;
-        pineGroup.add(underSkirt);
-      }
-
+      const rotY = (pseudoRand(pIdx * 43.3 + 12.7) - 0.5) * Math.PI * 2;
+      pineGroup.rotation.y = rotY;
       this.scene.add(pineGroup);
 
-      // Accurate radial cylinder collider + matching AABB for every pine tree
-      const pRadius = 0.42;
+      const pTrunkH = 8.2 * p.scale;
+      const pRadius = 0.44 * p.scale;
+
+      // Solid collision cylinder matching spruce base
       this.world.addCylinderCollider(p.x, p.z, pRadius, pTrunkH);
       const pBox = new THREE.Box3(
         new THREE.Vector3(p.x - pRadius, 0, p.z - pRadius),
         new THREE.Vector3(p.x + pRadius, pTrunkH, p.z + pRadius)
       );
-      this.world.colliders.push({ box: pBox, mesh: pTrunk, type: 'solid', isCylinder: true });
+      this.world.colliders.push({ box: pBox, mesh: pineGroup, type: 'solid', isCylinder: true });
+
+      // Asynchronously instantiate Blender Spruce model
+      assetPipeline.loadModel('/models/tree_spruce.glb', { collision: 'none' }).then(res => {
+        if (res && res.model) {
+          const m = res.model.clone(true);
+          m.scale.set(p.scale, p.scale, p.scale);
+          m.traverse(c => {
+            if (c.isMesh) {
+              c.castShadow = true;
+              c.receiveShadow = true;
+            }
+          });
+          pineGroup.add(m);
+        }
+      }).catch(err => {
+        console.warn('⚠️ [World] Failed to load tree_spruce.glb:', err);
+      });
     });
   }
 
@@ -2320,24 +1991,24 @@ export class World {
       this.scene.add(tuftGroup);
     });
 
-    // 2. Stylized Organic Shrubbery & Garden Bushes (Faceted low-poly foliage clusters matching apple tree aesthetic)
+    // 2. Handcrafted Blender Alpine Shrubbery & Currant Bushes
     const bushPlacements = [
       // Terrace flanking bushes (framing the farmhouse garden and stone retaining wall)
       { x: -7.5, z: -25.5, s: 1.15 },
-      { x: 7.5, z: -25.5, s: 1.10 },
+      { x: 7.5,  z: -25.5, s: 1.10 },
       { x: -11.5, z: -27.5, s: 1.25 },
-      { x: 11.5, z: -27.5, s: 1.20 },
+      { x: 11.5,  z: -27.5, s: 1.20 },
       { x: -9.0, z: -18.5, s: 1.05 },
-      { x: 9.0, z: -18.5, s: 1.05 },
+      { x: 9.0,  z: -18.5, s: 1.05 },
       // Path and field borders (framing country lane and crop beds)
       { x: -6.5, z: -6.0, s: 0.95 },
-      { x: 6.5, z: -6.0, s: 0.95 },
-      { x: -6.5, z: 7.5, s: 1.00 },
-      { x: 6.5, z: 7.5, s: 1.00 },
+      { x: 6.5,  z: -6.0, s: 0.95 },
+      { x: -6.5, z: 7.5,  s: 1.00 },
+      { x: 6.5,  z: 7.5,  s: 1.00 },
       // Orchard & meadow borders
       { x: 16.5, z: -3.5, s: 1.10 },
       { x: 28.5, z: -3.5, s: 1.05 },
-      { x: -21.5, z: 2.0, s: 1.15 },
+      { x: -21.5, z: 2.0,  s: 1.15 },
       { x: -21.5, z: 12.0, s: 1.10 }
     ];
 
@@ -2352,51 +2023,25 @@ export class World {
     const baseY = (z <= -23 && Math.abs(x) <= 14) ? 0.60 : 0.0;
     bGroup.position.set(x, baseY, z);
     bGroup.rotation.y = Math.random() * Math.PI * 2;
-
-    // Woody stem cluster grounded at base
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06 * scale, 0.09 * scale, 0.35 * scale, 5),
-      this.materials.trunk
-    );
-    stem.position.set(0, 0.17 * scale, 0);
-    stem.castShadow = true;
-    bGroup.add(stem);
-
-    // Multi-lobed faceted foliage clumps with organic variation
-    const clumps = [
-      { r: 0.72, pos: [0, 0.52, 0], mat: this.materials.bushDark },
-      { r: 0.58, pos: [0.22, 0.65, 0.18], mat: this.materials.bushBright },
-      { r: 0.52, pos: [-0.22, 0.60, -0.15], mat: this.materials.bushDark },
-      { r: 0.44, pos: [0.05, 0.82, -0.06], mat: this.materials.leafLight },
-      { r: 0.36, pos: [-0.16, 0.72, 0.20], mat: this.materials.bushBright },
-      { r: 0.30, pos: [0.26, 0.42, -0.20], mat: this.materials.bushDark }
-    ];
-
-    clumps.forEach((c, idx) => {
-      const geom = new THREE.DodecahedronGeometry(c.r * scale, 1);
-      const mesh = new THREE.Mesh(geom, c.mat);
-      mesh.position.set(c.pos[0] * scale, c.pos[1] * scale, c.pos[2] * scale);
-      mesh.rotation.set(idx * 0.4, idx * 0.7, idx * 0.2);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      bGroup.add(mesh);
-    });
-
-    // Decorative ruby berry accents
-    const berryGeom = new THREE.DodecahedronGeometry(0.05 * scale, 0);
-    const berryPositions = [
-      [0.26, 0.75, 0.26],
-      [-0.14, 0.82, 0.22],
-      [0.10, 0.90, -0.10],
-      [-0.28, 0.65, -0.16]
-    ];
-    berryPositions.forEach(bp => {
-      const berry = new THREE.Mesh(berryGeom, this.materials.apple);
-      berry.position.set(bp[0] * scale, bp[1] * scale, bp[2] * scale);
-      bGroup.add(berry);
-    });
-
     this.scene.add(bGroup);
+
+    // Asynchronously instantiate handcrafted Blender Shrub Bush model
+    assetPipeline.loadModel('/models/shrub_bush.glb', { collision: 'none' }).then(res => {
+      if (res && res.model) {
+        const m = res.model.clone(true);
+        m.scale.set(scale, scale, scale);
+        m.traverse(c => {
+          if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        bGroup.add(m);
+      }
+    }).catch(err => {
+      console.warn('⚠️ [World] Failed to load shrub_bush.glb:', err);
+    });
+
     return bGroup;
   }
 
