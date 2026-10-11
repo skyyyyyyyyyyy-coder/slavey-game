@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { sounds } from './audio.js';
 import { events } from './events.js';
+import { assetPipeline } from './assetPipeline.js';
 
 /**
  * Authoritative Data-Driven Crop Definitions
@@ -93,6 +94,11 @@ export class FarmingManager {
       skipped: false
     };
 
+    // Blender 3D Model Templates & State
+    this.assetsLoaded = false;
+    this.soilTemplate = null;
+    this.carrotStageTemplates = new Map(); // 1, 2, 3, 4 -> mesh template
+
     // Shared Materials
     this.initMaterials();
 
@@ -107,8 +113,11 @@ export class FarmingManager {
     // Seed replenishment bin mesh near farmhouse knoll
     this.createEmergencySeedSupply();
 
-    // Bind Day Rollover listener for TimeManager-driven growth
+    // Bind Day Rollover and Hour listener for TimeManager-driven growth
     this.setupTimeListener();
+
+    // Asynchronously load handcrafted Blender farming assets
+    this.loadBlenderAssets();
   }
 
   initMaterials() {
@@ -138,21 +147,25 @@ export class FarmingManager {
     wetTex.wrapS = THREE.RepeatWrapping; wetTex.wrapT = THREE.RepeatWrapping;
 
     this.materials = {
+      // PBR Non-Metallic Soil Materials with organic Vertex Color modulation
       drySoil: new THREE.MeshStandardMaterial({
-        map: dryTex,
-        color: 0x6e492b,
-        roughness: 0.92,
-        metalness: 0.02
+        vertexColors: true,
+        color: 0xffffff,
+        roughness: 0.94,
+        metalness: 0.0,
+        dithering: true
       }),
       wateredSoil: new THREE.MeshStandardMaterial({
-        map: wetTex,
-        color: 0x2e1c0e,
-        roughness: 0.45,
-        metalness: 0.08
+        vertexColors: true,
+        color: 0x554438, // Softly darkened saturated humus with subtle moisture sheen
+        roughness: 0.72,
+        metalness: 0.0,
+        dithering: true
       }),
       soilFurrow: new THREE.MeshStandardMaterial({
         color: 0x4a2e16,
-        roughness: 0.95
+        roughness: 0.95,
+        metalness: 0.0
       }),
       selectorValid: new THREE.MeshBasicMaterial({
         color: 0x22c55e,
@@ -261,6 +274,159 @@ export class FarmingManager {
     window.addEventListener('time:dayRollover', (e) => {
       this.handleDayRollover(e.detail);
     });
+    events.on('time:day_changed', (detail) => {
+      this.handleDayRollover(detail);
+    });
+    events.on('time:hour_changed', (detail) => {
+      this.handleHourChanged(detail);
+    });
+    window.addEventListener('time:hourChanged', (e) => {
+      this.handleHourChanged(e.detail);
+    });
+  }
+
+  handleHourChanged(detail = {}) {
+    if (detail.hour >= 12 || (this.timeManager && this.timeManager.hour >= 12)) {
+      this.checkIntradayGrowth();
+    }
+  }
+
+  /**
+   * Asynchronously loads handcrafted Blender 3D assets for farmland and crops
+   */
+  async loadBlenderAssets() {
+    try {
+      const [soilRes, carrotRes] = await Promise.all([
+        assetPipeline.loadModel('/models/farm_soil_tile.glb', { collision: 'none' }),
+        assetPipeline.loadModel('/models/crop_carrot.glb', { collision: 'none' })
+      ]);
+
+      // 1. Soil template
+      if (soilRes && soilRes.model) {
+        soilRes.model.traverse(c => {
+          if (c.isMesh) {
+            c.castShadow = false;
+            c.receiveShadow = true;
+            c.material = this.materials.drySoil;
+          }
+        });
+        this.soilTemplate = soilRes.model;
+      }
+
+      // 2. Carrot stage templates
+      if (carrotRes && carrotRes.model) {
+        carrotRes.model.traverse(c => {
+          if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+            if (c.material) {
+              c.material.vertexColors = true;
+              c.material.side = THREE.DoubleSide;
+              c.material.roughness = 0.58;
+              c.material.metalness = 0.0;
+              c.material.dithering = true;
+            }
+            if (c.name.includes('stage_01')) this.carrotStageTemplates.set(1, c);
+            else if (c.name.includes('stage_02')) this.carrotStageTemplates.set(2, c);
+            else if (c.name.includes('stage_03')) this.carrotStageTemplates.set(3, c);
+            else if (c.name.includes('stage_04')) this.carrotStageTemplates.set(4, c);
+          }
+        });
+      }
+
+      this.assetsLoaded = true;
+      console.log('🌾 [FarmingManager] Blender farming assets loaded (Soil + 4-Stage Carrot)!');
+
+      // Refresh any tiles placed before async loading completed
+      this.refreshAllVisuals();
+    } catch (err) {
+      console.warn('⚠️ [FarmingManager] Blender assets load failed, using procedural fallbacks:', err);
+    }
+  }
+
+  /**
+   * Re-evaluates and upgrades mesh representation on all active tiles once models load
+   */
+  refreshAllVisuals() {
+    this.tiles.forEach(tile => {
+      if (this.soilTemplate && (!tile.soilMesh || !tile.soilMesh.userData?.isBlenderModel)) {
+        const oldGroup = tile.soilGroup;
+        const wasWatered = tile.isWatered;
+        const crop = tile.crop;
+
+        while (oldGroup.children.length > 0) {
+          oldGroup.remove(oldGroup.children[0]);
+        }
+
+        const { soilMesh } = this.createSoilBedMesh(wasWatered);
+        oldGroup.add(soilMesh);
+        tile.soilMesh = soilMesh;
+        tile.furrows = [];
+
+        if (crop) {
+          this.renderCropMesh(tile);
+        }
+      } else if (tile.crop && tile.crop.type === 'carrot') {
+        this.renderCropMesh(tile);
+      }
+    });
+  }
+
+  /**
+   * Builds the connected 3x3 demonstration field in West Homestead arable zone (X in [-8, -6], Z in [1, 3])
+   * Showcases all 4 growth stages, dry vs watered soil, and continuous furrow alignment
+   */
+  createDemoField() {
+    const layout = [
+      { gx: -8, gz: 1, watered: false, crop: { type: 'carrot', stage: 1, visualStage: 1, daysWatered: 0 } },
+      { gx: -7, gz: 1, watered: false, crop: { type: 'carrot', stage: 2, visualStage: 2, daysWatered: 1 } },
+      { gx: -6, gz: 1, watered: false, crop: { type: 'carrot', stage: 2, visualStage: 3, daysWatered: 1 } },
+      { gx: -8, gz: 2, watered: false, crop: { type: 'carrot', stage: 4, visualStage: 4, daysWatered: 2 } },
+      { gx: -7, gz: 2, watered: false, crop: { type: 'carrot', stage: 4, visualStage: 4, daysWatered: 2 } },
+      { gx: -6, gz: 2, watered: false, crop: { type: 'carrot', stage: 2, visualStage: 3, daysWatered: 1 } },
+      { gx: -8, gz: 3, watered: true, crop: null },
+      { gx: -7, gz: 3, watered: false, crop: null },
+      { gx: -6, gz: 3, watered: true, crop: { type: 'carrot', stage: 1, visualStage: 1, daysWatered: 1 } },
+    ];
+
+    layout.forEach(({ gx, gz, watered, crop }) => {
+      const key = `${gx}_${gz}`;
+      if (this.tiles.has(key)) {
+        const existing = this.tiles.get(key);
+        this.farmingGroup.remove(existing.soilGroup);
+        this.tiles.delete(key);
+      }
+
+      const { soilGroup, soilMesh, furrows } = this.createSoilBedMesh(watered);
+      soilGroup.position.set(gx, 0.0, gz);
+      this.farmingGroup.add(soilGroup);
+
+      const tileData = {
+        gx,
+        gz,
+        key,
+        isTilled: true,
+        isWatered: watered,
+        crop: crop ? {
+          type: crop.type,
+          stage: crop.stage,
+          visualStage: crop.visualStage,
+          daysWatered: crop.daysWatered,
+          plantedDay: this.timeManager?.day || 1
+        } : null,
+        soilGroup,
+        soilMesh,
+        furrows,
+        cropGroup: null
+      };
+
+      this.tiles.set(key, tileData);
+      if (tileData.crop) {
+        this.renderCropMesh(tileData);
+      }
+    });
+
+    console.log(`🌾 [FarmingManager] Populated 3x3 demonstration field in West Homestead arable zone (${layout.length} tiles).`);
   }
 
   /**
@@ -357,10 +523,42 @@ export class FarmingManager {
   }
 
   /**
+   * Intraday growth evaluation: advances crops to intermediate cosmetic stages at midday
+   * (e.g. carrot peeking orange shoulder at 12:00 PM without altering authoritative harvest readiness)
+   */
+  checkIntradayGrowth() {
+    if (!this.timeManager) return;
+    const hour = this.timeManager.hour;
+    if (hour < 12) return;
+
+    let growthOccurred = false;
+    this.tiles.forEach(tile => {
+      if (tile.crop && tile.crop.type === 'carrot') {
+        // Only advance to visual stage 3 if already watered for at least 1 day and not yet ripe
+        if (tile.crop.daysWatered >= 1 && tile.crop.stage < 4) {
+          const curVisual = tile.crop.visualStage || tile.crop.stage || 1;
+          if (curVisual < 3) {
+            tile.crop.visualStage = 3;
+            this.renderCropMesh(tile);
+            growthOccurred = true;
+          }
+        }
+      }
+    });
+
+    if (growthOccurred) {
+      events.emit('farming:intraday_growth');
+    }
+  }
+
+  /**
    * Raycast from player camera to target the active 1x1m tile
    */
   updateTargeting(player) {
     if (!player || !player.camera) return;
+
+    // Check for midday intraday visual growth
+    this.checkIntradayGrowth();
 
     const origin = new THREE.Vector3();
     player.camera.getWorldPosition(origin);
@@ -533,29 +731,30 @@ export class FarmingManager {
   createSoilBedMesh(isWatered = false) {
     const soilGroup = new THREE.Group();
 
-    // Clean flat 1.0x1.0m raised soil bed slab (elevation 0.035m, perfectly aligned)
-    const soilMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1.0, 0.035, 1.0),
-      isWatered ? this.materials.wateredSoil : this.materials.drySoil
-    );
-    soilMesh.position.set(0, 0.0175, 0);
-    soilMesh.receiveShadow = true;
+    let soilMesh;
+    if (this.soilTemplate) {
+      soilMesh = this.soilTemplate.clone(true);
+      soilMesh.userData = { isBlenderModel: true };
+      soilMesh.traverse(child => {
+        if (child.isMesh) {
+          child.material = isWatered ? this.materials.wateredSoil : this.materials.drySoil;
+          child.receiveShadow = true;
+          child.castShadow = false;
+        }
+      });
+      soilMesh.position.set(0, 0, 0);
+    } else {
+      // Clean flat 1.0x1.0m fallback box
+      soilMesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.035, 1.0),
+        isWatered ? this.materials.wateredSoil : this.materials.drySoil
+      );
+      soilMesh.position.set(0, 0.0175, 0);
+      soilMesh.receiveShadow = true;
+    }
     soilGroup.add(soilMesh);
 
-    // Subtle aligned longitudinal furrow ridges running along Z (connecting seamlessly between adjacent tiles)
-    const furrowGeo = new THREE.BoxGeometry(0.18, 0.012, 1.0);
-    const furrowMat = isWatered ? this.materials.wateredSoil : this.materials.soilFurrow;
-    const furrowL = new THREE.Mesh(furrowGeo, furrowMat);
-    furrowL.position.set(-0.26, 0.038, 0);
-    furrowL.receiveShadow = true;
-    soilGroup.add(furrowL);
-
-    const furrowR = new THREE.Mesh(furrowGeo, furrowMat);
-    furrowR.position.set(0.26, 0.038, 0);
-    furrowR.receiveShadow = true;
-    soilGroup.add(furrowR);
-
-    return { soilGroup, soilMesh, furrows: [furrowL, furrowR] };
+    return { soilGroup, soilMesh, furrows: [] };
   }
 
   /**
@@ -616,7 +815,10 @@ export class FarmingManager {
     this.wateringCanCurrent = Math.max(0, this.wateringCanCurrent - 1);
 
     tile.isWatered = true;
-    tile.soilMesh.material = this.materials.wateredSoil;
+    if (tile.soilMesh) {
+      tile.soilMesh.material = this.materials.wateredSoil;
+      tile.soilMesh.traverse?.(c => { if (c.isMesh) c.material = this.materials.wateredSoil; });
+    }
     if (tile.furrows) {
       tile.furrows.forEach(f => f.material = this.materials.wateredSoil);
     }
@@ -654,8 +856,9 @@ export class FarmingManager {
 
     tile.crop = {
       type: cropId,
-      stage: 1, // Seedling
-      daysWatered: tile.isWatered ? 1 : 0,
+      stage: 1, // Authoritative maturity
+      visualStage: 1, // Cosmetic presentation
+      daysWatered: 0,
       plantedDay: this.timeManager ? this.timeManager.day : 1
     };
 
@@ -769,25 +972,39 @@ export class FarmingManager {
           const cropDef = CROPS[tile.crop.type];
 
           // Determine target stage based on days watered
-          let newStage = tile.crop.stage;
+          let newAuthStage = tile.crop.stage;
+          let newVisualStage = tile.crop.visualStage || tile.crop.stage || 1;
+
           if (tile.crop.type === 'carrot') {
-            newStage = tile.crop.daysWatered >= 2 ? 4 : 2;
+            // Carrot authoritative maturity requires 2 watered days
+            if (tile.crop.daysWatered >= 2) {
+              newAuthStage = 4;
+              newVisualStage = 4;
+            } else if (tile.crop.daysWatered >= 1) {
+              newAuthStage = 2;
+              // On morning rollover after day 1 watered: visual stage 2
+              newVisualStage = Math.max(newVisualStage, 2);
+            }
           } else if (tile.crop.type === 'wheat') {
-            if (tile.crop.daysWatered >= 3) newStage = 4;
-            else if (tile.crop.daysWatered >= 2) newStage = 3;
-            else newStage = 2;
+            if (tile.crop.daysWatered >= 3) { newAuthStage = 4; newVisualStage = 4; }
+            else if (tile.crop.daysWatered >= 2) { newAuthStage = 3; newVisualStage = 3; }
+            else { newAuthStage = 2; newVisualStage = 2; }
           } else if (tile.crop.type === 'pumpkin') {
-            if (tile.crop.daysWatered >= 4) newStage = 4;
-            else if (tile.crop.daysWatered >= 2) newStage = 3;
-            else if (tile.crop.daysWatered >= 1) newStage = 2;
+            if (tile.crop.daysWatered >= 4) { newAuthStage = 4; newVisualStage = 4; }
+            else if (tile.crop.daysWatered >= 2) { newAuthStage = 3; newVisualStage = 3; }
+            else if (tile.crop.daysWatered >= 1) { newAuthStage = 2; newVisualStage = 2; }
           } else if (tile.crop.type === 'tomato') {
-            if (tile.crop.daysWatered >= 3) newStage = 4;
-            else if (tile.crop.daysWatered >= 2) newStage = 3;
-            else newStage = 2;
+            if (tile.crop.daysWatered >= 3) { newAuthStage = 4; newVisualStage = 4; }
+            else if (tile.crop.daysWatered >= 2) { newAuthStage = 3; newVisualStage = 3; }
+            else { newAuthStage = 2; newVisualStage = 2; }
           }
 
-          if (newStage !== tile.crop.stage) {
-            tile.crop.stage = newStage;
+          // MONOTONIC GROWTH GUARANTEE: visual stage NEVER regresses!
+          newVisualStage = Math.max(newVisualStage, tile.crop.visualStage || 1);
+
+          if (newAuthStage !== tile.crop.stage || newVisualStage !== tile.crop.visualStage) {
+            tile.crop.stage = newAuthStage;
+            tile.crop.visualStage = newVisualStage;
             this.renderCropMesh(tile);
             growthOccurred = true;
           }
@@ -795,7 +1012,10 @@ export class FarmingManager {
 
         // Daily moisture reset boundary: soil dries out
         tile.isWatered = false;
-        tile.soilMesh.material = this.materials.drySoil;
+        if (tile.soilMesh) {
+          tile.soilMesh.material = this.materials.drySoil;
+          tile.soilMesh.traverse?.(c => { if (c.isMesh) c.material = this.materials.drySoil; });
+        }
         if (tile.furrows) {
           tile.furrows.forEach(f => f.material = this.materials.soilFurrow);
         }
@@ -822,55 +1042,22 @@ export class FarmingManager {
     }
 
     const group = new THREE.Group();
-    const { type, stage } = tile.crop;
+    const { type, stage, visualStage } = tile.crop;
+    const stageNum = visualStage || stage || 1;
     const mats = this.materials;
 
     if (type === 'carrot') {
-      if (stage === 1) {
-        // Stage 1: Seedling sprout
-        for (let b = 0; b < 3; b++) {
-          const sprout = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.12, 5), mats.leafSprout);
-          sprout.position.set((b - 1) * 0.06, 0.06, (Math.random() - 0.5) * 0.05);
-          sprout.rotation.z = (b - 1) * 0.2;
-          group.add(sprout);
-        }
-      } else if (stage === 2) {
-        // Stage 2: Growing green foliage
-        for (let b = 0; b < 5; b++) {
-          const frond = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.26, 5), mats.leafGreen);
-          const rot = (b / 5) * Math.PI * 2;
-          frond.position.set(Math.cos(rot) * 0.08, 0.13, Math.sin(rot) * 0.08);
-          frond.rotation.z = 0.25;
-          group.add(frond);
-        }
-      } else if (stage === 3) {
-        // Stage 3: Mature leafy top, emerging orange crown
-        const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.08, 8), mats.carrotOrange);
-        crown.position.set(0, 0.04, 0);
-        group.add(crown);
-
-        for (let b = 0; b < 6; b++) {
-          const frond = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38, 5), mats.leafLush);
-          const rot = (b / 6) * Math.PI * 2;
-          frond.position.set(Math.cos(rot) * 0.1, 0.22, Math.sin(rot) * 0.1);
-          frond.rotation.z = 0.28;
-          group.add(frond);
-        }
-      } else if (stage === 4) {
-        // Stage 4: Ready to harvest! Exposed ripe carrot root with lush feathery top
-        const root = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.36, 8), mats.carrotOrange);
-        root.rotation.x = Math.PI;
-        root.position.set(0, 0.12, 0);
-        root.castShadow = true;
-        group.add(root);
-
-        for (let b = 0; b < 7; b++) {
-          const frond = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.48, 5), mats.leafLush);
-          const rot = (b / 7) * Math.PI * 2;
-          frond.position.set(Math.cos(rot) * 0.12, 0.38, Math.sin(rot) * 0.12);
-          frond.rotation.z = 0.32;
-          group.add(frond);
-        }
+      if (this.carrotStageTemplates && this.carrotStageTemplates.has(stageNum)) {
+        const template = this.carrotStageTemplates.get(stageNum);
+        const mesh = template.clone(true);
+        // Anchor base strictly at soil surface (0, 0, 0)
+        mesh.position.set(0, 0, 0);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = { isBlenderModel: true };
+        group.add(mesh);
+      } else {
+        this.renderProceduralCarrot(group, stageNum, mats);
       }
     } else if (type === 'wheat') {
       if (stage === 1) {
@@ -1048,6 +1235,55 @@ export class FarmingManager {
     tile.soilGroup.add(group);
   }
 
+  renderProceduralCarrot(group, stage, mats) {
+    if (stage === 1) {
+      // Stage 1: Seedling sprout
+      for (let b = 0; b < 3; b++) {
+        const sprout = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.12, 5), mats.leafSprout);
+        sprout.position.set((b - 1) * 0.06, 0.06, (Math.random() - 0.5) * 0.05);
+        sprout.rotation.z = (b - 1) * 0.2;
+        group.add(sprout);
+      }
+    } else if (stage === 2) {
+      // Stage 2: Growing green foliage
+      for (let b = 0; b < 5; b++) {
+        const frond = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.26, 5), mats.leafGreen);
+        const rot = (b / 5) * Math.PI * 2;
+        frond.position.set(Math.cos(rot) * 0.08, 0.13, Math.sin(rot) * 0.08);
+        frond.rotation.z = 0.25;
+        group.add(frond);
+      }
+    } else if (stage === 3) {
+      // Stage 3: Mature leafy top, emerging orange crown
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.04, 0.08, 8), mats.carrotOrange);
+      crown.position.set(0, 0.04, 0);
+      group.add(crown);
+
+      for (let b = 0; b < 6; b++) {
+        const frond = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.38, 5), mats.leafLush);
+        const rot = (b / 6) * Math.PI * 2;
+        frond.position.set(Math.cos(rot) * 0.1, 0.22, Math.sin(rot) * 0.1);
+        frond.rotation.z = 0.28;
+        group.add(frond);
+      }
+    } else if (stage === 4) {
+      // Stage 4: Ready to harvest! Exposed ripe carrot root with lush feathery top
+      const root = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.36, 8), mats.carrotOrange);
+      root.rotation.x = Math.PI;
+      root.position.set(0, 0.12, 0);
+      root.castShadow = true;
+      group.add(root);
+
+      for (let b = 0; b < 7; b++) {
+        const frond = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.48, 5), mats.leafLush);
+        const rot = (b / 7) * Math.PI * 2;
+        frond.position.set(Math.cos(rot) * 0.12, 0.38, Math.sin(rot) * 0.12);
+        frond.rotation.z = 0.32;
+        group.add(frond);
+      }
+    }
+  }
+
   advanceTutorial(targetStep) {
     if (this.tutorial.completed || this.tutorial.skipped) return;
     this.tutorial.step = Math.max(this.tutorial.step, targetStep);
@@ -1078,6 +1314,7 @@ export class FarmingManager {
         crop: tile.crop ? {
           type: tile.crop.type,
           stage: tile.crop.stage,
+          visualStage: tile.crop.visualStage || tile.crop.stage || 1,
           daysWatered: tile.crop.daysWatered,
           plantedDay: tile.crop.plantedDay
         } : null
@@ -1153,6 +1390,7 @@ export class FarmingManager {
           crop: crop ? {
             type: crop.type,
             stage: crop.stage || 1,
+            visualStage: crop.visualStage || crop.stage || 1,
             daysWatered: crop.daysWatered || 0,
             plantedDay: crop.plantedDay || 1
           } : null,

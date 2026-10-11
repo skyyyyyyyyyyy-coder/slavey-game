@@ -46,6 +46,11 @@ if (farmingManager.seedSupplyInteractable) {
   world.interactables.push(farmingManager.seedSupplyInteractable);
 }
 
+// Pre-populate 3x3 demonstration field in West Homestead arable zone if no tiles exist
+if (farmingManager.tiles.size === 0) {
+  farmingManager.createDemoField();
+}
+
 // Wire save state provider
 saveManager.registerStateProvider(() => ({
   player,
@@ -520,6 +525,7 @@ function startNewGame() {
   farmingManager.selectedCropId = 'carrot';
   farmingManager.wateringCanCurrent = 12;
   farmingManager.tutorial = { step: 1, completed: false, skipped: false };
+  farmingManager.createDemoField();
 
   isGameStarted = true;
   startOverlay.classList.add('hidden');
@@ -728,6 +734,22 @@ if (urlParams.get('cam') === 'garden') {
   player.respawn(new THREE.Vector3(-2.8, 1.2, 3.0));
   player.yaw = -1.57;
   player.pitch = -0.35;
+} else if (urlParams.get('cam') === 'c1-overview') {
+  player.respawn(new THREE.Vector3(-7.0, 1.35, 4.6));
+  player.yaw = 0.0;
+  player.pitch = -0.35;
+} else if (urlParams.get('cam') === 'c1-lineup') {
+  player.respawn(new THREE.Vector3(-8.8, 0.6, 1.0));
+  player.yaw = -1.57;
+  player.pitch = -0.55;
+} else if (urlParams.get('cam') === 'c1-closeup') {
+  player.respawn(new THREE.Vector3(-7.0, 0.2, 1.15));
+  player.yaw = 3.14159;
+  player.pitch = -0.68;
+} else if (urlParams.get('cam') === 'c1-soil') {
+  player.respawn(new THREE.Vector3(-7.5, 0.2, 2.45));
+  player.yaw = 3.14159;
+  player.pitch = -0.78;
 }
 
 const timeParam = urlParams.get('time');
