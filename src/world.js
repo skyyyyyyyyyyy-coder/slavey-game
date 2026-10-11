@@ -315,41 +315,96 @@ export class World {
   }
 
   createClouds() {
-    this.cloudMaterial = new THREE.MeshLambertMaterial({
+    // Upgraded Stylized-Realistic Volumetric Cloud Formations
+    // Matches Reference Board 2:
+    // - Cumulus clusters with broad puffy bases and tiered billows
+    // - Layered formations with varied altitude decks (55m - 95m)
+    // - Vertical build-ups and wispy distant horizon banks
+    // - Natural asymmetry and drift dynamics
+    const cloudWhiteMat = new THREE.MeshLambertMaterial({
       color: 0xffffff,
       flatShading: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.94,
       fog: true
     });
-    const cloudMat = this.cloudMaterial;
+    const cloudShadeMat = new THREE.MeshLambertMaterial({
+      color: 0xe2e8f0, // Soft atmospheric slate-blue ambient underside
+      flatShading: true,
+      transparent: true,
+      opacity: 0.92,
+      fog: true
+    });
+    this.cloudMaterial = cloudWhiteMat;
 
-    for (let i = 0; i < 28; i++) {
+    // 16 Curated Volumetric Cloud Formations with varied architectural structure
+    const cloudDeckConfigs = [
+      // Large towering cumulus vertical build-ups
+      { x: -90, z: -110, y: 72, scale: 1.45, puffs: 9, speed: 0.28, type: 'tower' },
+      { x: 30,  z: -125, y: 76, scale: 1.60, puffs: 10, speed: 0.25, type: 'tower' },
+      { x: 110, z: -100, y: 70, scale: 1.35, puffs: 8, speed: 0.30, type: 'tower' },
+
+      // Mid-level sweeping layered cumulus banks
+      { x: -120, z: -30,  y: 65, scale: 1.30, puffs: 7, speed: 0.35, type: 'bank' },
+      { x: -60,  z: 15,   y: 62, scale: 1.20, puffs: 6, speed: 0.38, type: 'bank' },
+      { x: 20,   z: -25,  y: 68, scale: 1.25, puffs: 7, speed: 0.34, type: 'bank' },
+      { x: 85,   z: 25,   y: 64, scale: 1.20, puffs: 6, speed: 0.36, type: 'bank' },
+      { x: 130,  z: -20,  y: 66, scale: 1.30, puffs: 7, speed: 0.32, type: 'bank' },
+
+      // Southern horizon layered formations
+      { x: -80, z: 110, y: 74, scale: 1.40, puffs: 8, speed: 0.26, type: 'bank' },
+      { x: 0,   z: 125, y: 78, scale: 1.50, puffs: 9, speed: 0.24, type: 'tower' },
+      { x: 80,  z: 115, y: 72, scale: 1.35, puffs: 8, speed: 0.27, type: 'bank' },
+
+      // Soft high-altitude wispy decks
+      { x: -40, z: -70, y: 88, scale: 1.10, puffs: 5, speed: 0.42, type: 'wispy' },
+      { x: 60,  z: -65, y: 92, scale: 1.15, puffs: 5, speed: 0.40, type: 'wispy' },
+      { x: -95, z: 60,  y: 86, scale: 1.05, puffs: 5, speed: 0.44, type: 'wispy' },
+      { x: 50,  z: 75,  y: 90, scale: 1.10, puffs: 5, speed: 0.42, type: 'wispy' },
+      { x: -10, z: 0,   y: 84, scale: 1.15, puffs: 6, speed: 0.38, type: 'bank' }
+    ];
+
+    cloudDeckConfigs.forEach((cfg, cIdx) => {
       const cloudGroup = new THREE.Group();
-      const numPuffs = 5 + Math.floor(Math.random() * 5);
 
-      for (let p = 0; p < numPuffs; p++) {
-        const size = 8 + Math.random() * 9;
-        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(size, 1), cloudMat);
-        puff.position.set(
-          (Math.random() - 0.5) * 24,
-          (Math.random() - 0.5) * 5,
-          (Math.random() - 0.5) * 16
-        );
+      for (let p = 0; p < cfg.puffs; p++) {
+        const pt = p / cfg.puffs;
+        // Base puffs are larger and slightly shaded underneath; upper puffs are bright and billowy
+        const isBase = p < 3;
+        const puffMat = isBase ? cloudShadeMat : cloudWhiteMat;
+
+        let r = (9 + Math.sin(p * 2.1) * 3.5) * cfg.scale;
+        let ox = (p - cfg.puffs / 2) * (14 * cfg.scale) + Math.sin(p * 3.4) * 5;
+        let oz = Math.cos(p * 2.8) * (12 * cfg.scale);
+        let oy = 0;
+
+        if (cfg.type === 'tower') {
+          // Towering build-up: central billows rise significantly higher
+          const towerFactor = Math.sin(pt * Math.PI);
+          oy = towerFactor * (16 * cfg.scale);
+          r *= (0.8 + 0.4 * towerFactor);
+        } else if (cfg.type === 'bank') {
+          oy = (Math.sin(p * 1.5) - 0.2) * 4;
+        } else {
+          // Wispy: flatter, elongated
+          r *= 0.75;
+          oy = (Math.sin(p * 2.0)) * 2;
+        }
+
+        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), puffMat);
+        puff.position.set(ox, oy, oz);
+        puff.rotation.set(p * 0.4, p * 0.7, p * 0.3);
         cloudGroup.add(puff);
       }
 
-      const x = (Math.random() - 0.5) * 280;
-      const z = (Math.random() - 0.5) * 280;
-      const y = 68 + Math.random() * 28;
-      cloudGroup.position.set(x, y, z);
+      cloudGroup.position.set(cfg.x, cfg.y, cfg.z);
       this.scene.add(cloudGroup);
 
       this.clouds.push({
         group: cloudGroup,
-        speed: 0.35 + Math.random() * 0.55
+        speed: cfg.speed
       });
-    }
+    });
   }
 
   /**
@@ -450,27 +505,33 @@ export class World {
     westLane.receiveShadow = true;
     this.scene.add(westLane);
 
-    // Naturally embedded rustic flagstone edging along the main lane
+    // Naturally embedded rustic flagstone edging along the main lane (Instanced)
     const cobbleMat = new THREE.MeshStandardMaterial({ color: 0x857d77, roughness: 0.92, flatShading: true });
-    for (let z = -20; z <= 30; z += 1.8) {
-      const stoneL = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.32 + Math.sin(z) * 0.08, 0.42 + Math.cos(z) * 0.08, 0.05, 6),
-        cobbleMat
-      );
-      stoneL.position.set(-2.3 + Math.sin(z * 0.6) * 0.22, 0.025, z);
-      stoneL.rotation.y = Math.sin(z) * Math.PI;
-      stoneL.receiveShadow = true;
-      this.scene.add(stoneL);
+    const cobbleGeo = new THREE.CylinderGeometry(0.38, 0.44, 0.05, 6);
+    const zSteps = [];
+    for (let z = -20; z <= 30; z += 1.8) zSteps.push(z);
+    const instancedCobble = new THREE.InstancedMesh(cobbleGeo, cobbleMat, zSteps.length * 2);
+    instancedCobble.receiveShadow = true;
 
-      const stoneR = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.32 + Math.cos(z) * 0.08, 0.42 + Math.sin(z) * 0.08, 0.05, 6),
-        cobbleMat
-      );
-      stoneR.position.set(2.3 + Math.cos(z * 0.6) * 0.22, 0.025, z);
-      stoneR.rotation.y = Math.cos(z) * Math.PI;
-      stoneR.receiveShadow = true;
-      this.scene.add(stoneR);
+    const dummyC = new THREE.Object3D();
+    let cIdx = 0;
+    for (const z of zSteps) {
+      const scaleL = (0.32 + Math.sin(z) * 0.08) / 0.38;
+      dummyC.position.set(-2.3 + Math.sin(z * 0.6) * 0.22, 0.025, z);
+      dummyC.rotation.set(0, Math.sin(z) * Math.PI, 0);
+      dummyC.scale.set(scaleL, 1, scaleL);
+      dummyC.updateMatrix();
+      instancedCobble.setMatrixAt(cIdx++, dummyC.matrix);
+
+      const scaleR = (0.32 + Math.cos(z) * 0.08) / 0.38;
+      dummyC.position.set(2.3 + Math.cos(z * 0.6) * 0.22, 0.025, z);
+      dummyC.rotation.set(0, Math.cos(z) * Math.PI, 0);
+      dummyC.scale.set(scaleR, 1, scaleR);
+      dummyC.updateMatrix();
+      instancedCobble.setMatrixAt(cIdx++, dummyC.matrix);
     }
+    instancedCobble.instanceMatrix.needsUpdate = true;
+    this.scene.add(instancedCobble);
   }
 
   /**
@@ -497,7 +558,6 @@ export class World {
       const mainMesh = new THREE.Mesh(mainGeo, mat);
       mainMesh.position.set(0, height / 2, 0);
       mainMesh.rotation.y = yaw;
-      mainMesh.castShadow = true;
       mainMesh.receiveShadow = true;
       group.add(mainMesh);
 
@@ -541,76 +601,116 @@ export class World {
       this.scene.add(group);
     };
 
-    // 1. DISTANT ALPINE RANGES (pushed back to 115m - 160m, framing the sky gracefully)
-    // North Range (magnificent panoramic backdrop safely behind Farmhouse estate)
+    // 1. DISTANT ALPINE RANGES (pushed back to 115m - 165m, framing the sky gracefully)
+    // Refined color palette with atmospheric depth and high tonal separation
+    const rockFarHigh = new THREE.MeshStandardMaterial({ color: 0x718096, roughness: 0.92, flatShading: true }); // Distant atmospheric slate
+    const rockFarDeep = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.95, flatShading: true }); // Dramatic shadowed cliffs
+    const rockNear    = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.88, flatShading: true }); // Rich near-range bedrock
+    const ridgeAccent = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.90, flatShading: true }); // Sharp ridge precipices
+
+    // North Range (magnificent panoramic alpine backdrop safely behind Farmhouse estate)
     const northMassifs = [
-      { x: -95, z: -145, r: 58, h: 38, yaw: 0.3, sx: 1.4, sz: 0.8 },
-      { x: -50, z: -155, r: 64, h: 42, yaw: 0.8, sx: 1.3, sz: 0.8 },
-      { x: -5,  z: -160, r: 68, h: 44, yaw: 0.2, sx: 1.5, sz: 0.8 },
-      { x: 42,  z: -152, r: 62, h: 41, yaw: 1.1, sx: 1.3, sz: 0.8 },
-      { x: 88,  z: -145, r: 56, h: 37, yaw: 0.5, sx: 1.4, sz: 0.8 }
+      { x: -95, z: -148, r: 60, h: 42, yaw: 0.35, sx: 1.45, sz: 0.85, mat: rockFarHigh },
+      { x: -50, z: -158, r: 66, h: 48, yaw: 0.75, sx: 1.35, sz: 0.85, mat: rockFarDeep },
+      { x: -5,  z: -164, r: 72, h: 52, yaw: 0.18, sx: 1.55, sz: 0.80, mat: rockFarHigh },
+      { x: 44,  z: -155, r: 64, h: 46, yaw: 1.15, sx: 1.35, sz: 0.85, mat: rockFarDeep },
+      { x: 92,  z: -148, r: 58, h: 40, yaw: 0.52, sx: 1.40, sz: 0.85, mat: rockFarHigh }
     ];
-    northMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
+    northMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
 
     // South Range
     const southMassifs = [
-      { x: -90, z: 125, r: 56, h: 36, yaw: 0.4, sx: 1.4, sz: 0.9 },
-      { x: -45, z: 135, r: 62, h: 38, yaw: 0.9, sx: 1.3, sz: 1.0 },
-      { x: 5,   z: 140, r: 66, h: 41, yaw: 0.3, sx: 1.5, sz: 0.9 },
-      { x: 50,  z: 134, r: 60, h: 37, yaw: 1.2, sx: 1.3, sz: 1.0 },
-      { x: 92,  z: 124, r: 54, h: 34, yaw: 0.6, sx: 1.4, sz: 0.9 }
+      { x: -92, z: 128, r: 58, h: 38, yaw: 0.42, sx: 1.42, sz: 0.92, mat: rockFarDeep },
+      { x: -46, z: 138, r: 64, h: 44, yaw: 0.88, sx: 1.32, sz: 0.95, mat: rockFarHigh },
+      { x: 6,   z: 144, r: 68, h: 48, yaw: 0.28, sx: 1.52, sz: 0.92, mat: rockFarDeep },
+      { x: 52,  z: 136, r: 62, h: 42, yaw: 1.18, sx: 1.32, sz: 0.95, mat: rockFarHigh },
+      { x: 94,  z: 126, r: 56, h: 36, yaw: 0.62, sx: 1.42, sz: 0.92, mat: rockFarDeep }
     ];
-    southMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
+    southMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
 
     // West Range
     const westMassifs = [
-      { x: -128, z: -70, r: 55, h: 36, yaw: 1.5, sx: 0.9, sz: 1.4 },
-      { x: -138, z: -20, r: 62, h: 39, yaw: 1.7, sx: 0.9, sz: 1.3 },
-      { x: -138, z: 30,  r: 60, h: 38, yaw: 1.4, sx: 0.9, sz: 1.4 },
-      { x: -126, z: 75,  r: 54, h: 35, yaw: 1.6, sx: 0.9, sz: 1.3 }
+      { x: -130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, mat: rockFarHigh },
+      { x: -140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, mat: rockFarDeep },
+      { x: -140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, mat: rockFarHigh },
+      { x: -128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, mat: rockFarDeep }
     ];
-    westMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
+    westMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
 
     // East Range
     const eastMassifs = [
-      { x: 128, z: -70, r: 55, h: 36, yaw: 1.5, sx: 0.9, sz: 1.4 },
-      { x: 138, z: -20, r: 62, h: 39, yaw: 1.7, sx: 0.9, sz: 1.3 },
-      { x: 138, z: 30,  r: 60, h: 38, yaw: 1.4, sx: 0.9, sz: 1.4 },
-      { x: 126, z: 75,  r: 54, h: 35, yaw: 1.6, sx: 0.9, sz: 1.3 }
+      { x: 130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, mat: rockFarHigh },
+      { x: 140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, mat: rockFarDeep },
+      { x: 140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, mat: rockFarHigh },
+      { x: 128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, mat: rockFarDeep }
     ];
-    eastMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, rockFar, true));
+    eastMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
 
-    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (pushed cleanly behind northern perimeter)
+    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (stronger light/shadow planes & cliff ridges)
     const midCrags = [
-      { x: -62, z: -108, r: 38, h: 28, yaw: 0.4, sx: 1.2, sz: 0.8 },
-      { x: -22, z: -114, r: 40, h: 29, yaw: 0.8, sx: 1.2, sz: 0.8 },
-      { x: 24,  z: -112, r: 40, h: 28, yaw: 0.2, sx: 1.2, sz: 0.8 },
-      { x: 64,  z: -106, r: 38, h: 27, yaw: 1.0, sx: 1.2, sz: 0.8 },
-      { x: -88, z: -25, r: 40, h: 25, yaw: 1.5, sx: 0.9, sz: 1.2 },
-      { x: -88, z: 35,  r: 40, h: 24, yaw: 1.6, sx: 0.9, sz: 1.2 },
-      { x: 88,  z: -25, r: 40, h: 25, yaw: 1.5, sx: 0.9, sz: 1.2 },
-      { x: 88,  z: 35,  r: 40, h: 24, yaw: 1.6, sx: 0.9, sz: 1.2 }
+      { x: -64, z: -110, r: 40, h: 32, yaw: 0.42, sx: 1.25, sz: 0.82, mat: rockNear },
+      { x: -24, z: -116, r: 42, h: 34, yaw: 0.82, sx: 1.25, sz: 0.82, mat: ridgeAccent },
+      { x: 26,  z: -114, r: 42, h: 33, yaw: 0.22, sx: 1.25, sz: 0.82, mat: rockNear },
+      { x: 66,  z: -108, r: 40, h: 31, yaw: 1.02, sx: 1.25, sz: 0.82, mat: ridgeAccent },
+      { x: -90, z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, mat: rockNear },
+      { x: -90, z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, mat: ridgeAccent },
+      { x: 90,  z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, mat: rockNear },
+      { x: 90,  z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, mat: ridgeAccent }
     ];
-    midCrags.forEach(mc => createSweepingMountain(mc.x, mc.z, mc.r, mc.h, mc.yaw, mc.sx, mc.sz, rockMid, false));
+    midCrags.forEach(mc => createSweepingMountain(mc.x, mc.z, mc.r, mc.h, mc.yaw, mc.sx, mc.sz, mc.mat, false));
 
-    // 3. ROLLING ALPINE FOOTHILLS (gentle green mounds naturally skirting valley perimeter)
-    for (let f = 0; f < 18; f++) {
-      const angle = (f / 18) * Math.PI * 2;
+    // 3. ROLLING ALPINE FOOTHILLS WITH NATURAL SLOPE AND TRANSITION CLUSTERS
+    // Matches Reference Board 2 (Grassy Foothills):
+    // - Gentle green slope mounds
+    // - Natural boulder and stone clusters at foothill skirt
+    // - Wildflower patches softening meadow-to-mountain boundary
+    const boulderMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.90, flatShading: true });
+    const flowerYellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
+    const flowerWhiteMat  = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
+
+    for (let f = 0; f < 22; f++) {
+      const angle = (f / 22) * Math.PI * 2;
       const isNorth = Math.sin(angle) < -0.15;
-      const dist = isNorth ? 82 + (f % 2) * 6 : 66 + (f % 2) * 6;
+      const dist = isNorth ? 80 + (f % 2) * 5 : 65 + (f % 2) * 5;
       const fx = Math.cos(angle) * dist;
       const fz = Math.sin(angle) * dist;
-      const fr = isNorth ? 22 + (f % 3) * 3 : 26 + (f % 3) * 4;
-      const fh = 12 + (f % 2) * 4;
+      const fr = isNorth ? 20 + (f % 3) * 3 : 24 + (f % 3) * 3;
+      const fh = 11 + (f % 2) * 3.5;
 
       const hillGeo = new THREE.ConeGeometry(fr, fh, 7);
-      hillGeo.scale(1.1, 1.0, isNorth ? 0.75 : 0.9);
+      hillGeo.scale(1.15, 1.0, isNorth ? 0.78 : 0.88);
       const hillMesh = new THREE.Mesh(hillGeo, foothillMat);
       hillMesh.position.set(fx, fh / 2, fz);
       hillMesh.rotation.y = angle + 0.3;
-      hillMesh.castShadow = true;
       hillMesh.receiveShadow = true;
       this.scene.add(hillMesh);
+
+      // Natural weathered boulder clusters at base of foothill
+      if (f % 2 === 0) {
+        const bGroup = new THREE.Group();
+        const bDist = dist - fr * 0.45;
+        bGroup.position.set(Math.cos(angle) * bDist, 0, Math.sin(angle) * bDist);
+
+        for (let b = 0; b < 3; b++) {
+          const bSize = 0.8 + (b * 0.4);
+          const bMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(bSize, 1), boulderMat);
+          bMesh.scale.set(1.2, 0.75, 1.0);
+          bMesh.position.set((b - 1) * 1.2, bSize * 0.4, (b % 2) * 0.6);
+          bMesh.rotation.set(b * 0.5, b * 0.8, b * 0.3);
+          bMesh.receiveShadow = true;
+          bGroup.add(bMesh);
+        }
+
+        // Wildflower blossoms accenting boulder bases
+        for (let fl = 0; fl < 4; fl++) {
+          const flMat = (fl % 2 === 0) ? flowerYellowMat : flowerWhiteMat;
+          const flMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 5), flMat);
+          flMesh.position.set(Math.cos(fl * 1.5) * 1.8, 0.16, Math.sin(fl * 1.5) * 1.8);
+          bGroup.add(flMesh);
+        }
+
+        this.scene.add(bGroup);
+      }
     }
 
     // 4. IMPENETRABLE VALLEY PERIMETER BOUNDARY WALLS
@@ -1039,29 +1139,6 @@ export class World {
       const paddockGroup = new THREE.Group();
       paddockGroup.position.set(x, 0, z);
 
-      // Split-rail fencing with open gate enclosing the natural arable paddock
-      const postGeo = new THREE.CylinderGeometry(0.1, 0.12, 1.1, 7);
-      const railGeoX = new THREE.BoxGeometry(w / 2 - 1.2, 0.1, 0.08);
-      const railGeoZ = new THREE.BoxGeometry(0.08, 0.1, d - 0.4);
-
-      // North Fence
-      const pN1 = new THREE.Mesh(postGeo, logMat); pN1.position.set(-w / 2, 0.55, -d / 2); paddockGroup.add(pN1);
-      const pN2 = new THREE.Mesh(postGeo, logMat); pN2.position.set(w / 2, 0.55, -d / 2); paddockGroup.add(pN2);
-      const rN = new THREE.Mesh(new THREE.BoxGeometry(w - 0.4, 0.1, 0.08), logMat); rN.position.set(0, 0.65, -d / 2); paddockGroup.add(rN);
-
-      // South Fence (with 2.4m central opening for walking)
-      const pS1 = new THREE.Mesh(postGeo, logMat); pS1.position.set(-w / 2, 0.55, d / 2); paddockGroup.add(pS1);
-      const pS2 = new THREE.Mesh(postGeo, logMat); pS2.position.set(w / 2, 0.55, d / 2); paddockGroup.add(pS2);
-      const pSGateL = new THREE.Mesh(postGeo, logMat); pSGateL.position.set(-1.4, 0.55, d / 2); paddockGroup.add(pSGateL);
-      const pSGateR = new THREE.Mesh(postGeo, logMat); pSGateR.position.set(1.4, 0.55, d / 2); paddockGroup.add(pSGateR);
-
-      const rSL = new THREE.Mesh(railGeoX, logMat); rSL.position.set(-w / 4 - 0.7, 0.65, d / 2); paddockGroup.add(rSL);
-      const rSR = new THREE.Mesh(railGeoX, logMat); rSR.position.set(w / 4 + 0.7, 0.65, d / 2); paddockGroup.add(rSR);
-
-      // West & East Fences
-      const rW = new THREE.Mesh(railGeoZ, logMat); rW.position.set(-w / 2, 0.65, 0); paddockGroup.add(rW);
-      const rE = new THREE.Mesh(railGeoZ, logMat); rE.position.set(w / 2, 0.65, 0); paddockGroup.add(rE);
-
       // Plot Signpost
       const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.3, 6), logMat);
       signPost.position.set(1.8, 0.65, d / 2 + 0.4);
@@ -1072,6 +1149,49 @@ export class World {
       paddockGroup.add(signBoard);
 
       this.scene.add(paddockGroup);
+
+      // Asynchronously instantiate 3D Handcrafted Blender Modular Fence Segments
+      // North fence (14m span = 4.8 segments scaled), East & West fences, and South fence with walking gate opening
+      assetPipeline.loadModel('/models/fence_segment.glb', { collision: 'none' }).then(res => {
+        if (!res || !res.model) return;
+        const masterFence = res.model;
+
+        // North boundary (3 segments along X)
+        for (let seg = -1; seg <= 1; seg++) {
+          const m = masterFence.clone(true);
+          m.position.set(seg * 2.9, 0, -d / 2);
+          m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+          paddockGroup.add(m);
+        }
+
+        // South boundary (2 segments leaving central 2.4m gate opening)
+        [-1, 1].forEach(side => {
+          const m = masterFence.clone(true);
+          m.position.set(side * 4.2, 0, d / 2);
+          m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+          paddockGroup.add(m);
+        });
+
+        // West boundary (2 segments rotated 90 degrees)
+        for (let seg = -0.5; seg <= 0.5; seg += 1) {
+          const m = masterFence.clone(true);
+          m.position.set(-w / 2, 0, seg * 2.9);
+          m.rotation.y = Math.PI / 2;
+          m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+          paddockGroup.add(m);
+        }
+
+        // East boundary (2 segments rotated 90 degrees)
+        for (let seg = -0.5; seg <= 0.5; seg += 1) {
+          const m = masterFence.clone(true);
+          m.position.set(w / 2, 0, seg * 2.9);
+          m.rotation.y = Math.PI / 2;
+          m.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+          paddockGroup.add(m);
+        }
+      }).catch(err => {
+        console.warn('⚠️ [World] Failed to load fence_segment.glb:', err);
+      });
     };
 
     // 1. WEST CARROT FIELD at (-16, -14)
@@ -1776,173 +1896,31 @@ export class World {
   createGardenStoneWell(x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
-
-    const stoneMat = this.materials.stoneWall;
-    const woodMat = this.materials.wood;
-    const logMat = this.materials.timberLog;
-    const ironMat = this.materials.ironMetal;
-    const roofMat = this.materials.roof;
-
-    // 1. Dressed Circular Stone Curb with Coping Stones
-    const curbOuter = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.55, 0.95, 18), stoneMat);
-    curbOuter.position.set(0, 0.475, 0);
-    curbOuter.castShadow = true;
-    curbOuter.receiveShadow = true;
-    group.add(curbOuter);
-
-    // Stone coping rim (rounded upper lip)
-    const copingRim = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.12, 8, 18), stoneMat);
-    copingRim.rotation.x = Math.PI / 2;
-    copingRim.position.set(0, 0.95, 0);
-    copingRim.castShadow = true;
-    group.add(copingRim);
-
-    // Dark well interior shaft
-    const shaftInner = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.22, 1.22, 0.92, 16),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.95 })
-    );
-    shaftInner.position.set(0, 0.46, 0);
-    group.add(shaftInner);
-
-    // 2. Shimmering Water Surface inside
-    const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.2, 1.2, 0.05, 16),
-      new THREE.MeshStandardMaterial({
-        color: 0x0284c7,
-        roughness: 0.08,
-        metalness: 0.35,
-        transparent: true,
-        opacity: 0.88
-      })
-    );
-    water.position.set(0, 0.55, 0);
-    group.add(water);
-
-    // 3. Heavy Timber A-Frame Uprights
-    const postGeo = new THREE.BoxGeometry(0.18, 2.7, 0.18);
-    const p1 = new THREE.Mesh(postGeo, logMat);
-    p1.position.set(-1.25, 1.45, 0);
-    p1.castShadow = true;
-    group.add(p1);
-
-    const p2 = new THREE.Mesh(postGeo, logMat);
-    p2.position.set(1.25, 1.45, 0);
-    p2.castShadow = true;
-    group.add(p2);
-
-    // A-frame diagonal braces
-    [-1.25, 1.25].forEach(px => {
-      const braceL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.1), logMat);
-      braceL.position.set(px, 2.2, 0.32);
-      braceL.rotation.x = 0.65;
-      group.add(braceL);
-
-      const braceR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.9, 0.1), logMat);
-      braceR.position.set(px, 2.2, -0.32);
-      braceR.rotation.x = -0.65;
-      group.add(braceR);
-    });
-
-    // Top crossbeam
-    const crossbeam = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.18, 0.18), logMat);
-    crossbeam.position.set(0, 2.65, 0);
-    crossbeam.castShadow = true;
-    group.add(crossbeam);
-
-    // 4. Wooden Winch Drum with Wrapped Rope
-    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.6, 12), woodMat);
-    drum.rotation.z = Math.PI / 2;
-    drum.position.set(0, 2.25, 0);
-    drum.castShadow = true;
-    group.add(drum);
-
-    // Coiled hemp rope around drum
-    const ropeCoil = new THREE.Mesh(new THREE.CylinderGeometry(0.155, 0.155, 0.65, 12), this.materials.strawTwine);
-    ropeCoil.rotation.z = Math.PI / 2;
-    ropeCoil.position.set(0, 2.25, 0);
-    group.add(ropeCoil);
-
-    // 5. Iron Crank Handle
-    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.45, 8), ironMat);
-    axle.rotation.z = Math.PI / 2;
-    axle.position.set(1.42, 2.25, 0);
-    group.add(axle);
-
-    const crankArm = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.4, 0.06), ironMat);
-    crankArm.position.set(1.62, 2.1, 0);
-    group.add(crankArm);
-
-    const crankGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.22, 8), woodMat);
-    crankGrip.rotation.x = Math.PI / 2;
-    crankGrip.position.set(1.62, 1.92, 0.1);
-    group.add(crankGrip);
-
-    // 6. Suspended Wooden Bucket with Iron Hoops
-    const hangingRope = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.95, 6), this.materials.strawTwine);
-    hangingRope.position.set(0, 1.75, 0);
-    group.add(hangingRope);
-
-    const bucketGroup = new THREE.Group();
-    bucketGroup.position.set(0, 1.15, 0);
-
-    const bucketBody = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.18, 0.38, 10), woodMat);
-    bucketBody.castShadow = true;
-    bucketGroup.add(bucketBody);
-
-    const hoop1 = new THREE.Mesh(new THREE.CylinderGeometry(0.245, 0.235, 0.04, 10), ironMat);
-    hoop1.position.set(0, 0.1, 0);
-    bucketGroup.add(hoop1);
-
-    const hoop2 = new THREE.Mesh(new THREE.CylinderGeometry(0.205, 0.195, 0.04, 10), ironMat);
-    hoop2.position.set(0, -0.1, 0);
-    bucketGroup.add(hoop2);
-
-    const bailHandle = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.02, 6, 12), ironMat);
-    bailHandle.position.set(0, 0.18, 0);
-    bucketGroup.add(bailHandle);
-    group.add(bucketGroup);
-
-    // 7. Shingled Gable Roof Canopy with Overhanging Eaves
-    const roofPitch = 0.65; // ~37 degrees
-    const rSlopeL = 1.6;
-    const rSlopeW = 2.95;
-
-    // South roof pitch
-    const roofSouth = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW, 0.14, rSlopeL), roofMat);
-    roofSouth.position.set(0, 3.1, 0.62);
-    roofSouth.rotation.x = roofPitch;
-    roofSouth.castShadow = true;
-    roofSouth.receiveShadow = true;
-    group.add(roofSouth);
-
-    // North roof pitch
-    const roofNorth = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW, 0.14, rSlopeL), roofMat);
-    roofNorth.position.set(0, 3.1, -0.62);
-    roofNorth.rotation.x = -roofPitch;
-    roofNorth.castShadow = true;
-    roofNorth.receiveShadow = true;
-    group.add(roofNorth);
-
-    // Ridge cap beam
-    const ridgeCap = new THREE.Mesh(new THREE.BoxGeometry(rSlopeW + 0.15, 0.18, 0.28), logMat);
-    ridgeCap.position.set(0, 3.65, 0);
-    ridgeCap.castShadow = true;
-    group.add(ridgeCap);
-
     this.scene.add(group);
 
-    // Solid Collider enclosing well curb
+    // Collision proxy: well base cylinder radius 1.35m, height 1.5m
+    const wellRadius = 1.35;
+    const wellHeight = 1.5;
+    this.world.addCylinderCollider(x, z, wellRadius, wellHeight);
     const wellBox = new THREE.Box3(
-      new THREE.Vector3(x - 1.6, 0, z - 1.6),
-      new THREE.Vector3(x + 1.6, 1.4, z + 1.6)
+      new THREE.Vector3(x - wellRadius, 0, z - wellRadius),
+      new THREE.Vector3(x + wellRadius, wellHeight, z + wellRadius)
     );
-    this.world.colliders.push({ box: wellBox, mesh: curbOuter, type: 'solid' });
+
+    // Invisible interaction proxy mesh for raycast targeting
+    const wellProxy = new THREE.Mesh(
+      new THREE.CylinderGeometry(wellRadius, wellRadius, wellHeight, 12),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    wellProxy.position.set(0, wellHeight / 2, 0);
+    group.add(wellProxy);
+
+    this.world.colliders.push({ box: wellBox, mesh: wellProxy, type: 'solid', isCylinder: true });
 
     // Interactive Stone Well for refilling Watering Can
-    this.interactables.push({
+    const wellInteractable = {
       id: 'stone_well',
-      mesh: curbOuter,
+      mesh: wellProxy,
       name: 'Stone Well',
       prompt: 'Refill Watering Can',
       ready: true,
@@ -1951,6 +1929,27 @@ export class World {
           player.farmingManager.refillWateringCan();
         }
       }
+    };
+    this.interactables.push(wellInteractable);
+
+    // Asynchronously instantiate handcrafted Blender Stone Well model
+    assetPipeline.loadModel('/models/farm_well.glb', { collision: 'none' }).then(res => {
+      if (res && res.model) {
+        const m = res.model.clone(true);
+        m.traverse(c => {
+          if (c.isMesh) {
+            c.castShadow = true;
+            c.receiveShadow = true;
+          }
+        });
+        group.add(m);
+
+        // Bind stone node as interaction mesh
+        const stoneNode = m.getObjectByName('well_stone') || m;
+        wellInteractable.mesh = stoneNode;
+      }
+    }).catch(err => {
+      console.warn('⚠️ [World] Failed to load farm_well.glb:', err);
     });
   }
 
@@ -1976,20 +1975,30 @@ export class World {
       tuftLocations.push({ x, z, scale: 0.65 + Math.random() * 0.6 });
     }
 
-    tuftLocations.forEach(tl => {
-      const tuftGroup = new THREE.Group();
-      tuftGroup.position.set(tl.x, 0.02, tl.z);
+    // 1. 3D Grass Blade Tufts (Instanced for high-performance rendering)
+    const bladeGeo = new THREE.ConeGeometry(0.06, 0.55, 4);
+    const totalBlades = tuftLocations.length * 5;
+    const instancedGrass = new THREE.InstancedMesh(bladeGeo, grassBladeMat, totalBlades);
+    instancedGrass.receiveShadow = true;
 
+    const dummyG = new THREE.Object3D();
+    let gIdx = 0;
+    tuftLocations.forEach(tl => {
       for (let b = 0; b < 5; b++) {
-        const blade = new THREE.Mesh(new THREE.ConeGeometry(0.06 * tl.scale, 0.55 * tl.scale, 4), grassBladeMat);
         const rotY = (b / 5) * Math.PI * 2;
-        blade.position.set(Math.cos(rotY) * 0.08, 0.28 * tl.scale, Math.sin(rotY) * 0.08);
-        blade.rotation.y = rotY;
-        blade.rotation.z = 0.24;
-        tuftGroup.add(blade);
+        dummyG.position.set(
+          tl.x + Math.cos(rotY) * 0.08,
+          0.02 + 0.28 * tl.scale,
+          tl.z + Math.sin(rotY) * 0.08
+        );
+        dummyG.rotation.set(0, rotY, 0.24);
+        dummyG.scale.set(tl.scale, tl.scale, tl.scale);
+        dummyG.updateMatrix();
+        instancedGrass.setMatrixAt(gIdx++, dummyG.matrix);
       }
-      this.scene.add(tuftGroup);
     });
+    instancedGrass.instanceMatrix.needsUpdate = true;
+    this.scene.add(instancedGrass);
 
     // 2. Handcrafted Blender Alpine Shrubbery & Currant Bushes
     const bushPlacements = [

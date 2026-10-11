@@ -217,9 +217,9 @@ export class FarmingManager {
   }
 
   createEmergencySeedSupply() {
-    // Rustic Emergency Seed Crate on knoll terrace at (-6.5, 0.6, -21.5)
+    // Rustic Emergency Seed Crate on knoll terrace at (-6.5, 0.6, -25.0)
     const seedBoxGroup = new THREE.Group();
-    seedBoxGroup.position.set(-6.5, 0.6, -21.5);
+    seedBoxGroup.position.set(-6.5, 0.6, -25.0);
 
     const boxMat = new THREE.MeshStandardMaterial({ color: 0x6d4c2d, roughness: 0.85 });
     const crate = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.55, 0.7), boxMat);
