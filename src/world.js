@@ -5,7 +5,8 @@ import { events } from './events.js';
 import { assetPipeline } from './assetPipeline.js';
 
 /**
- * Procedural lush alpine grass texture with natural dapples and meadow blossoms (1024x1024)
+ * Procedural natural alpine meadow pasture texture (1024x1024)
+ * Uses smooth organic gradient patches and directional turf grain to eliminate polka-dot artifacts.
  */
 function createGrassTexture() {
   const canvas = document.createElement('canvas');
@@ -13,43 +14,62 @@ function createGrassTexture() {
   canvas.height = 1024;
   const ctx = canvas.getContext('2d');
 
-  // Rich warm spring emerald base
-  ctx.fillStyle = '#489e35';
+  // Rich warm natural spring meadow base
+  ctx.fillStyle = '#428432';
   ctx.fillRect(0, 0, 1024, 1024);
 
-  // Soft natural tonal variations (warm meadow greens, pasture clover tones)
-  const tones = ['#3e8f2d', '#52b03a', '#5cbd44', '#368225', '#4aa533', '#429b30', '#5ba83c', '#469c36'];
-  for (let i = 0; i < 9000; i++) {
-    const x = Math.random() * 1024;
-    const y = Math.random() * 1024;
-    const r = 5 + Math.random() * 14;
-    ctx.fillStyle = tones[Math.floor(Math.random() * tones.length)];
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Seamless toroidal multi-octave harmonic terrain field (100% seamless, 0 polka-dot artifacts)
+  const imgData = ctx.getImageData(0, 0, 1024, 1024);
+  const data = imgData.data;
 
-  // Soft subtle blade texture in harmonized natural pasture greens
-  for (let i = 0; i < 7000; i++) {
+  for (let y = 0; y < 1024; y++) {
+    const ny = (y / 1024) * Math.PI * 2;
+    for (let x = 0; x < 1024; x++) {
+      const nx = (x / 1024) * Math.PI * 2;
+
+      // Periodic harmonic octaves guarantees seamless tiling across boundaries
+      const o1 = Math.sin(nx * 2) * Math.cos(ny * 2);
+      const o2 = 0.5 * Math.sin(nx * 5 + 0.8) * Math.cos(ny * 5 - 0.4);
+      const o3 = 0.25 * Math.cos(nx * 11 + ny * 6);
+      const o4 = 0.12 * Math.sin(nx * 23 - ny * 17);
+
+      const n = (o1 + o2 + o3 + o4) / 1.87;
+      const t = (n + 1.0) * 0.5; // [0, 1]
+
+      // Smooth pasture tone gradient: deep rich moss (#387226) -> spring turf (#448733) -> sunlit clover (#4e9a3c)
+      const r = Math.round(56 + t * 24);
+      const g = Math.round(114 + t * 40);
+      const b = Math.round(38 + t * 22);
+
+      const idx = (y * 1024 + x) * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Directional organic pasture grass grain (thousands of fine micro-blades)
+  ctx.lineWidth = 0.9;
+  for (let i = 0; i < 16000; i++) {
     const x = Math.random() * 1024;
     const y = Math.random() * 1024;
-    const len = 4 + Math.random() * 8;
-    ctx.strokeStyle = Math.random() > 0.5 ? '#459837' : '#387e2b';
-    ctx.lineWidth = 1.2;
+    const len = 3 + Math.random() * 5;
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+    ctx.strokeStyle = Math.random() > 0.5 ? 'rgba(84, 162, 64, 0.40)' : 'rgba(48, 102, 34, 0.40)';
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 3, y - len);
+    ctx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     ctx.stroke();
   }
 
-  // Subtle tiny wildflower micro-specks (clover blossoms, buttercup pollen spots)
-  for (let i = 0; i < 600; i++) {
+  // Delicate micro-stipples (pale subalpine moss & clover)
+  for (let i = 0; i < 1500; i++) {
     const x = Math.random() * 1024;
     const y = Math.random() * 1024;
-    ctx.fillStyle = Math.random() > 0.4 ? '#fef08a' : '#f0fdf4';
-    ctx.beginPath();
-    ctx.arc(x, y, 1.2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = Math.random() > 0.4 ? 'rgba(254, 243, 199, 0.45)' : 'rgba(240, 253, 244, 0.45)';
+    ctx.fillRect(x, y, 1.2, 1.2);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -57,6 +77,7 @@ function createGrassTexture() {
   texture.wrapT = THREE.RepeatWrapping;
   return texture;
 }
+
 
 
 /**
@@ -406,122 +427,139 @@ export class World {
   }
 
   /**
-   * Generates a sculpted cumulus puff geometry with vertex-baked internal scattering.
-   * Crown vertices are sunlit bright, while underside vertices carry soft lavender-slate atmospheric tint.
+   * Generates a cohesive, horizontally extended cloud bank/shelf.
+   * Produces soft, natural horizontal cloud formations with gentle cumulus billows
+   * and flat, softly shaded undersides, completely eliminating spherical grape-bunch blobs.
    */
-  createCloudPuffGeo(radius) {
-    let geo = new THREE.IcosahedronGeometry(radius, 2);
-    if (geo.index) geo = geo.toNonIndexed();
-    geo.computeVertexNormals();
+  buildCloudBankGeo(length, width, height) {
+    const segmentsX = 24;
+    const segmentsZ = 12;
+    const positions = [];
+    const colors = [];
+    const indices = [];
 
-    const pos = geo.getAttribute('position');
-    const count = pos.count;
-    const colors = new Float32Array(count * 3);
+    // Top surface with organic harmonic billow envelopes
+    for (let j = 0; j <= segmentsZ; j++) {
+      const vz = (j / segmentsZ) - 0.5;
+      const z = vz * width;
+      const edgeZ = Math.cos(vz * Math.PI); // 1 in center, 0 at north/south edges
 
-    for (let i = 0; i < count; i++) {
-      let x = pos.getX(i);
-      let y = pos.getY(i);
-      let z = pos.getZ(i);
+      for (let i = 0; i <= segmentsX; i++) {
+        const vx = (i / segmentsX) - 0.5;
+        const x = vx * length;
+        const edgeX = Math.cos(vx * Math.PI); // 1 in center, 0 at east/west edges
+        const envelope = Math.max(0, edgeX * edgeZ);
 
-      if (y < 0) {
-        y *= 0.72; // flattened billow underside
-      } else {
-        y *= 1.15; // taller billowy crown
+        // Cumulus billows along the bank using multi-octave harmonic waves
+        const lobe1 = 0.55 + 0.45 * Math.sin(vx * 5.2 * Math.PI + 0.4);
+        const lobe2 = 0.35 * Math.cos(vx * 9.5 * Math.PI + vz * 3.5);
+        const lobe3 = 0.20 * Math.sin(vx * 14.0 * Math.PI);
+        const billow = Math.max(0, (lobe1 + lobe2 + lobe3) / 1.10);
+
+        const y = envelope * height * billow;
+        positions.push(x, y, z);
+
+        // Vertical scattering: sunlit bright top, soft lavender-slate atmospheric underside
+        const normY = Math.min(1.0, Math.max(0.0, y / (height * 0.90 + 0.01)));
+        const r = THREE.MathUtils.lerp(0.88, 1.0, normY);
+        const g = THREE.MathUtils.lerp(0.90, 1.0, normY);
+        const b = THREE.MathUtils.lerp(0.96, 1.0, normY);
+        colors.push(r, g, b);
       }
-      pos.setXYZ(i, x, y, z);
-
-      // Vertical scattering gradient: top is 1.0, bottom is soft lavender-slate (0.80, 0.83, 0.92)
-      const normY = (y / (radius * 1.15) + 1.0) * 0.5;
-      const clampedY = Math.max(0, Math.min(1, normY));
-      const r = THREE.MathUtils.lerp(0.80, 1.0, clampedY);
-      const g = THREE.MathUtils.lerp(0.83, 1.0, clampedY);
-      const b = THREE.MathUtils.lerp(0.92, 1.0, clampedY);
-      colors[i * 3] = r;
-      colors[i * 3 + 1] = g;
-      colors[i * 3 + 2] = b;
     }
-    pos.needsUpdate = true;
+
+    const rowSize = segmentsX + 1;
+    for (let j = 0; j < segmentsZ; j++) {
+      for (let i = 0; i < segmentsX; i++) {
+        const i0 = j * rowSize + i;
+        const i1 = j * rowSize + (i + 1);
+        const i2 = (j + 1) * rowSize + i;
+        const i3 = (j + 1) * rowSize + (i + 1);
+        indices.push(i0, i2, i1);
+        indices.push(i1, i2, i3);
+      }
+    }
+
+    // Flat softly-shaded underside billow
+    const underBaseIdx = positions.length / 3;
+    for (let j = 0; j <= segmentsZ; j++) {
+      const vz = (j / segmentsZ) - 0.5;
+      const z = vz * width;
+      const edgeZ = Math.cos(vz * Math.PI);
+      for (let i = 0; i <= segmentsX; i++) {
+        const vx = (i / segmentsX) - 0.5;
+        const x = vx * length;
+        const edgeX = Math.cos(vx * Math.PI);
+        const envelope = Math.max(0, edgeX * edgeZ);
+        const y = -envelope * height * 0.16;
+        positions.push(x, y, z);
+        colors.push(0.86, 0.88, 0.94);
+      }
+    }
+
+    for (let j = 0; j < segmentsZ; j++) {
+      for (let i = 0; i < segmentsX; i++) {
+        const i0 = underBaseIdx + j * rowSize + i;
+        const i1 = underBaseIdx + j * rowSize + (i + 1);
+        const i2 = underBaseIdx + (j + 1) * rowSize + i;
+        const i3 = underBaseIdx + (j + 1) * rowSize + (i + 1);
+        indices.push(i0, i1, i2);
+        indices.push(i1, i3, i2);
+      }
+    }
+
+    let geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.setIndex(indices);
+    geo = geo.toNonIndexed();
     geo.computeVertexNormals();
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return geo;
   }
 
   createClouds() {
-    // Upgraded Soft Volumetric-Style Multi-Deck Cloud Formations
-    // Sculpted icosahedron puffs with vertex-baked vertical scattering gradients
-    const cloudMat = new THREE.MeshLambertMaterial({
+    // Cohesive, horizontally extended cloud shelves with soft billowy silhouettes
+    // Uses MeshBasicMaterial with vertex colors so clouds are cleanly illuminated by the sky and sun,
+    // avoiding muddy green ground-bounce tint from hemisphere lighting.
+    const cloudMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       vertexColors: true,
-      flatShading: true,
       transparent: true,
-      opacity: 0.94,
+      opacity: 0.90,
       fog: true
     });
     this.cloudMaterial = cloudMat;
 
-    // 16 Curated Volumetric Cloud Formations with varied altitude decks (55m - 95m)
-    const cloudDeckConfigs = [
-      // Large towering cumulus vertical build-ups
-      { x: -90, z: -110, y: 72, scale: 1.45, puffs: 9, speed: 0.28, type: 'tower' },
-      { x: 30,  z: -125, y: 76, scale: 1.60, puffs: 10, speed: 0.25, type: 'tower' },
-      { x: 110, z: -100, y: 70, scale: 1.35, puffs: 8, speed: 0.30, type: 'tower' },
+    // 8 Expansive Cloud Banks distributed high along the mountain horizons (155m - 175m altitude)
+    // Leaves the zenith overhead completely open for stars and open sky
+    const cloudBankConfigs = [
+      // Northern skyline banks (framing the distant alpine massifs)
+      { x: -85, z: -155, y: 165, length: 110, width: 38, height: 14, yaw: 0.15, speed: 0.18 },
+      { x: 45,  z: -165, y: 172, length: 125, width: 42, height: 16, yaw: -0.12, speed: 0.16 },
+      { x: 140, z: -145, y: 160, length: 95, width: 34, height: 12, yaw: 0.22, speed: 0.20 },
 
-      // Mid-level sweeping layered cumulus banks
-      { x: -120, z: -30,  y: 65, scale: 1.30, puffs: 7, speed: 0.35, type: 'bank' },
-      { x: -60,  z: 15,   y: 62, scale: 1.20, puffs: 6, speed: 0.38, type: 'bank' },
-      { x: 20,   z: -25,  y: 68, scale: 1.25, puffs: 7, speed: 0.34, type: 'bank' },
-      { x: 85,   z: 25,   y: 64, scale: 1.20, puffs: 6, speed: 0.36, type: 'bank' },
-      { x: 130,  z: -20,  y: 66, scale: 1.30, puffs: 7, speed: 0.32, type: 'bank' },
+      // Midground lateral banks (East & West horizons)
+      { x: -155, z: -20, y: 158, length: 105, width: 36, height: 13, yaw: 0.35, speed: 0.22 },
+      { x: 160,  z: 20,  y: 162, length: 110, width: 38, height: 14, yaw: -0.28, speed: 0.19 },
 
-      // Southern horizon layered formations
-      { x: -80, z: 110, y: 74, scale: 1.40, puffs: 8, speed: 0.26, type: 'bank' },
-      { x: 0,   z: 125, y: 78, scale: 1.50, puffs: 9, speed: 0.24, type: 'tower' },
-      { x: 80,  z: 115, y: 72, scale: 1.35, puffs: 8, speed: 0.27, type: 'bank' },
-
-      // Soft high-altitude wispy decks
-      { x: -40, z: -70, y: 88, scale: 1.10, puffs: 5, speed: 0.42, type: 'wispy' },
-      { x: 60,  z: -65, y: 92, scale: 1.15, puffs: 5, speed: 0.40, type: 'wispy' },
-      { x: -95, z: 60,  y: 86, scale: 1.05, puffs: 5, speed: 0.44, type: 'wispy' },
-      { x: 50,  z: 75,  y: 90, scale: 1.10, puffs: 5, speed: 0.42, type: 'wispy' },
-      { x: -10, z: 0,   y: 84, scale: 1.15, puffs: 6, speed: 0.38, type: 'bank' }
+      // Southern skyline banks
+      { x: -95, z: 150, y: 168, length: 115, width: 40, height: 15, yaw: -0.18, speed: 0.17 },
+      { x: 35,  z: 165, y: 175, length: 130, width: 45, height: 17, yaw: 0.10, speed: 0.15 },
+      { x: 135, z: 145, y: 164, length: 98, width: 34, height: 13, yaw: -0.25, speed: 0.20 }
     ];
 
-    cloudDeckConfigs.forEach((cfg, cIdx) => {
-      const cloudGroup = new THREE.Group();
-
-      for (let p = 0; p < cfg.puffs; p++) {
-        const pt = p / cfg.puffs;
-        let r = (9 + Math.sin(p * 2.1) * 3.5) * cfg.scale;
-        let ox = (p - cfg.puffs / 2) * (14 * cfg.scale) + Math.sin(p * 3.4) * 5;
-        let oz = Math.cos(p * 2.8) * (12 * cfg.scale);
-        let oy = 0;
-
-        if (cfg.type === 'tower') {
-          const towerFactor = Math.sin(pt * Math.PI);
-          oy = towerFactor * (16 * cfg.scale);
-          r *= (0.8 + 0.4 * towerFactor);
-        } else if (cfg.type === 'bank') {
-          oy = (Math.sin(p * 1.5) - 0.2) * 4;
-        } else {
-          r *= 0.75;
-          oy = (Math.sin(p * 2.0)) * 2;
-        }
-
-        const puffGeo = this.createCloudPuffGeo(r);
-        const puff = new THREE.Mesh(puffGeo, cloudMat);
-        puff.position.set(ox, oy, oz);
-        puff.rotation.set(p * 0.4, p * 0.7, p * 0.3);
-        cloudGroup.add(puff);
-      }
-
-      cloudGroup.position.set(cfg.x, cfg.y, cfg.z);
-      this.scene.add(cloudGroup);
+    cloudBankConfigs.forEach((cfg, cIdx) => {
+      const geo = this.buildCloudBankGeo(cfg.length, cfg.width, cfg.height);
+      const mesh = new THREE.Mesh(geo, cloudMat);
+      mesh.position.set(cfg.x, cfg.y, cfg.z);
+      mesh.rotation.y = cfg.yaw;
+      this.scene.add(mesh);
 
       this.clouds.push({
-        group: cloudGroup,
+        group: mesh,
         speed: cfg.speed,
         baseY: cfg.y,
-        phase: cIdx * 0.75
+        phase: cIdx * 0.85
       });
     });
   }
@@ -531,7 +569,7 @@ export class World {
    */
   buildMeadowAndTerrace() {
     const grassTex = createGrassTexture();
-    grassTex.repeat.set(40, 40);
+    grassTex.repeat.set(16, 16);
     const grassMat = new THREE.MeshStandardMaterial({
       map: grassTex,
       roughness: 0.85,
@@ -565,7 +603,7 @@ export class World {
 
     // Terrace grass top
     const terraceTopTex = createGrassTexture();
-    terraceTopTex.repeat.set(8, 7);
+    terraceTopTex.repeat.set(3, 2);
     const terraceTop = new THREE.Mesh(
       new THREE.BoxGeometry(terraceW, 0.05, terraceD),
       new THREE.MeshStandardMaterial({ map: terraceTopTex, roughness: 0.85 })
@@ -780,30 +818,31 @@ export class World {
   }
 
   /**
-   * Sculpted Rolling Moraine Foothill Generator
-   * Produces asymmetric glacial moraine mounds with smooth vertex-colored meadow-to-scree transitions.
+   * Gentle, Organic Rolling Foothill Generator (Stage 2.1 Visual Repair)
+   * Produces broad, low, undulating terrain mounds that seamlessly blend into the meadow floor.
+   * Eliminates steep cone pyramids, triangular faces, and artificial enclosed walls.
    */
-  buildMoraineFoothillGeo(radius, height, radialSegments = 16, heightSegments = 8, isNorth = false) {
+  buildRollingFoothillGeo(radius, height, radialSegments = 24, heightSegments = 12) {
     const positions = [];
     const indices = [];
 
+    // Cosine dome profile: y = height * 0.5 * (1 + cos(pi * (1-v)))
+    // Zero slope at the crest and zero elevation at the rim (touching valley floor seamlessly).
     for (let j = 0; j <= heightSegments; j++) {
-      const v = j / heightSegments;
-      const y = v * height;
-      const vProfile = Math.pow(v, 1.25);
-      const baseR = radius * (1.0 - vProfile);
+      const v = j / heightSegments; // 0 (rim) to 1 (crest)
+      const normR = 1.0 - v; // 1 at rim, 0 at crest
+      const y = height * 0.5 * (1.0 + Math.cos((1.0 - v) * Math.PI));
 
       for (let i = 0; i < radialSegments; i++) {
         const u = i / radialSegments;
         const theta = u * Math.PI * 2;
-        const m1 = 0.12 * Math.cos(3 * theta);
-        const m2 = 0.08 * Math.sin(5 * theta + 0.4);
-        const moraineFactor = 1.0 + m1 + m2;
-        const r = j === heightSegments ? 0 : Math.max(0.1, baseR * moraineFactor);
+        // Subtle organic undulating perimeter modulation (low frequency, gentle rolling crests)
+        const wave = 1.0 + 0.12 * Math.cos(2 * theta) + 0.08 * Math.sin(3 * theta + 0.5);
+        const r = normR * radius * wave;
 
-        const sx = 1.15;
-        const sz = isNorth ? 0.78 : 0.88;
-        positions.push(Math.cos(theta) * r * sx, y, Math.sin(theta) * r * sz);
+        const x = Math.cos(theta) * r;
+        const z = Math.sin(theta) * r;
+        positions.push(x, y, z);
       }
     }
 
@@ -833,17 +872,22 @@ export class World {
     const count = posAttr.count;
     const colors = new Float32Array(count * 3);
 
-    const cBase = new THREE.Color(0x264e36);
-    const cMid = new THREE.Color(0x3d7a4f);
-    const cScree = new THREE.Color(0x5a6b7d);
+    // Color gradient harmonized with the meadow pasture base:
+    // Base matches meadow turf (#428432), mid is subalpine heather (#528f3a), top is gentle scree/weathered rock (#64748b)
+    const cMeadow = new THREE.Color(0x428432);
+    const cHeather = new THREE.Color(0x528f3a);
+    const cAlpine = new THREE.Color(0x607865);
+    const cCrestRock = new THREE.Color(0x6b7b84);
     const tempC = new THREE.Color();
 
     for (let k = 0; k < count; k++) {
-      const v = posAttr.getY(k) / height;
-      if (v < 0.35) {
-        tempC.copy(cBase).lerp(cMid, v / 0.35);
+      const v = posAttr.getY(k) / Math.max(0.1, height);
+      if (v < 0.40) {
+        tempC.copy(cMeadow).lerp(cHeather, v / 0.40);
+      } else if (v < 0.75) {
+        tempC.copy(cHeather).lerp(cAlpine, (v - 0.40) / 0.35);
       } else {
-        tempC.copy(cMid).lerp(cScree, (v - 0.35) / 0.65);
+        tempC.copy(cAlpine).lerp(cCrestRock, (v - 0.75) / 0.25);
       }
       colors[k * 3] = tempC.r;
       colors[k * 3 + 1] = tempC.g;
@@ -855,7 +899,7 @@ export class World {
 
   /**
    * Sweeping Layered Alpine Mountain Massifs & Ridge Horizons
-   * Built with geological sculpted massifs across 3 depth tiers, vertex-colored moraine foothills,
+   * Built with geological sculpted massifs across 3 depth tiers, vertex-colored rolling foothills,
    * and impenetrable perimeter boundary colliders.
    */
   buildLayeredMountainHorizon() {
@@ -866,7 +910,7 @@ export class World {
       flatShading: true
     });
 
-    const foothillMoraineMat = new THREE.MeshStandardMaterial({
+    const foothillMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
       roughness: 0.88,
       flatShading: true
@@ -885,14 +929,14 @@ export class World {
         ridgeDepth: cfg.ridgeDepth || 0.32,
         twist: cfg.twist || 0.35,
         hasSnow: cfg.hasSnow !== undefined ? cfg.hasSnow : true,
-        snowLevel: cfg.snowLevel || 0.60,
+        snowLevel: cfg.snowLevel || 0.46,
         snowGullyExtension: 0.22,
         baseGreenLevel: 0.20,
         rockColorHigh: cfg.rockHigh || 0x64748b,
         rockColorMid: cfg.rockMid || 0x475569,
         rockColorLow: cfg.rockLow || 0x334155,
         snowColor: 0xf8fafc,
-        skirtColor: 0x1e3a29,
+        skirtColor: 0x224231,
         scaleX: cfg.sx || 1.0,
         scaleZ: cfg.sz || 1.0
       });
@@ -915,14 +959,14 @@ export class World {
           ridgeDepth: 0.28,
           twist: -(cfg.twist || 0.35) * 0.8,
           hasSnow: cfg.hasSnow !== undefined ? cfg.hasSnow : (sH >= 24),
-          snowLevel: (cfg.snowLevel || 0.60) + 0.05,
+          snowLevel: (cfg.snowLevel || 0.46) + 0.05,
           snowGullyExtension: 0.18,
           baseGreenLevel: 0.24,
           rockColorHigh: cfg.rockHigh || 0x64748b,
           rockColorMid: cfg.rockMid || 0x475569,
           rockColorLow: cfg.rockLow || 0x334155,
           snowColor: 0xf1f5f9,
-          skirtColor: 0x1e3a29,
+          skirtColor: 0x224231,
           scaleX: (cfg.sx || 1.0) * 0.9,
           scaleZ: (cfg.sz || 1.0) * 1.1
         });
@@ -943,97 +987,96 @@ export class World {
       this.scene.add(group);
     };
 
-    // 1. DISTANT ALPINE RANGES (pushed back to 125m - 165m, framing the valley sky)
-    // Distant massifs do not cast shadow onto the 2048x2048 map, avoiding acne and keeping sharpness on the valley
+    // 1. TOWERING DISTANT ALPINE RANGES (elevated to 66m - 84m, framing the valley sky majestically)
+    // Pushed back to 155m - 180m so the entire northern skyline features crisp alpine snow
     const northMassifs = [
-      { x: -95, z: -148, r: 60, h: 42, yaw: 0.35, sx: 1.45, sz: 0.85, ridges: 5, twist: 0.35, snowLevel: 0.58 },
-      { x: -50, z: -158, r: 66, h: 48, yaw: 0.75, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.30, snowLevel: 0.54 },
-      { x: -5,  z: -164, r: 72, h: 52, yaw: 0.18, sx: 1.55, sz: 0.80, ridges: 5, twist: 0.40, snowLevel: 0.52 },
-      { x: 44,  z: -155, r: 64, h: 46, yaw: 1.15, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.35, snowLevel: 0.56 },
-      { x: 92,  z: -148, r: 58, h: 40, yaw: 0.52, sx: 1.40, sz: 0.85, ridges: 5, twist: 0.32, snowLevel: 0.60 }
+      { x: -105, z: -168, r: 84, h: 68, yaw: 0.35, sx: 1.45, sz: 0.85, ridges: 5, twist: 0.35, snowLevel: 0.46 },
+      { x: -55,  z: -175, r: 90, h: 76, yaw: 0.75, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.30, snowLevel: 0.44 },
+      { x: 0,    z: -180, r: 96, h: 84, yaw: 0.18, sx: 1.55, sz: 0.80, ridges: 5, twist: 0.38, snowLevel: 0.42 }, // Grand Central Peak
+      { x: 55,   z: -172, r: 88, h: 74, yaw: 1.15, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.35, snowLevel: 0.45 },
+      { x: 105,  z: -165, r: 82, h: 66, yaw: 0.52, sx: 1.40, sz: 0.85, ridges: 5, twist: 0.32, snowLevel: 0.48 }
     ];
     northMassifs.forEach(m => createSweepingMassif(m, true));
 
     const southMassifs = [
-      { x: -92, z: 128, r: 58, h: 38, yaw: 0.42, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.32, snowLevel: 0.60 },
-      { x: -46, z: 138, r: 64, h: 44, yaw: 0.88, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.38, snowLevel: 0.55 },
-      { x: 6,   z: 144, r: 68, h: 48, yaw: 0.28, sx: 1.52, sz: 0.92, ridges: 5, twist: 0.36, snowLevel: 0.52 },
-      { x: 52,  z: 136, r: 62, h: 42, yaw: 1.18, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.32, snowLevel: 0.58 },
-      { x: 94,  z: 126, r: 56, h: 36, yaw: 0.62, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.30, snowLevel: 0.62 }
+      { x: -95, z: 140, r: 76, h: 58, yaw: 0.42, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.32, snowLevel: 0.52 },
+      { x: -45, z: 148, r: 82, h: 64, yaw: 0.88, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.38, snowLevel: 0.48 },
+      { x: 10,  z: 154, r: 86, h: 68, yaw: 0.28, sx: 1.52, sz: 0.92, ridges: 5, twist: 0.36, snowLevel: 0.46 },
+      { x: 60,  z: 146, r: 80, h: 62, yaw: 1.18, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.32, snowLevel: 0.50 },
+      { x: 105, z: 138, r: 74, h: 56, yaw: 0.62, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.30, snowLevel: 0.54 }
     ];
     southMassifs.forEach(m => createSweepingMassif(m, true));
 
     const westMassifs = [
-      { x: -130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.60 },
-      { x: -140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.55 },
-      { x: -140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.58 },
-      { x: -128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.62 }
+      { x: -145, z: -75, r: 74, h: 58, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.52 },
+      { x: -152, z: -20, r: 80, h: 65, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.48 },
+      { x: -150, z: 35,  r: 78, h: 62, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.50 },
+      { x: -142, z: 85,  r: 72, h: 55, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.55 }
     ];
     westMassifs.forEach(m => createSweepingMassif(m, true));
 
     const eastMassifs = [
-      { x: 130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.60 },
-      { x: 140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.55 },
-      { x: 140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.58 },
-      { x: 128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.62 }
+      { x: 145, z: -75, r: 74, h: 58, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.52 },
+      { x: 152, z: -20, r: 80, h: 65, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.48 },
+      { x: 150, z: 35,  r: 78, h: 62, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.50 },
+      { x: 142, z: 85,  r: 72, h: 55, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.55 }
     ];
     eastMassifs.forEach(m => createSweepingMassif(m, true));
 
-    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (closer depth tier with prominent facets casting crisp ground shadows)
+    // 2. MIDGROUND MOUNTAIN RIDGES & FLANK CRAGS (Clear central North corridor |X| < 45 to leave snowy massifs visible)
     const midCrags = [
-      { x: -64, z: -110, r: 40, h: 32, yaw: 0.42, sx: 1.25, sz: 0.82, ridges: 4, twist: 0.30, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
-      { x: -24, z: -116, r: 42, h: 34, yaw: 0.82, sx: 1.25, sz: 0.82, ridges: 5, twist: -0.28, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
-      { x: 26,  z: -114, r: 42, h: 33, yaw: 0.22, sx: 1.25, sz: 0.82, ridges: 5, twist: 0.28, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
-      { x: 66,  z: -108, r: 40, h: 31, yaw: 1.02, sx: 1.25, sz: 0.82, ridges: 4, twist: -0.30, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
-      { x: -90, z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
-      { x: -90, z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
-      { x: 90,  z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
-      { x: 90,  z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f }
+      { x: -75, z: -125, r: 44, h: 28, yaw: 0.42, sx: 1.25, sz: 0.82, ridges: 4, twist: 0.28, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: 75,  z: -125, r: 44, h: 28, yaw: 1.02, sx: 1.25, sz: 0.82, ridges: 4, twist: -0.28, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
+      { x: -105, z: -25, r: 45, h: 26, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: -105, z: 40,  r: 45, h: 25, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
+      { x: 105,  z: -25, r: 45, h: 26, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: 105,  z: 40,  r: 45, h: 25, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f }
     ];
     midCrags.forEach(mc => createSweepingMassif(mc, false));
 
-    // 3. ROLLING ALPINE FOOTHILLS WITH ORGANIC MORAINE GEOMETRY AND BOULDER SCREE
+    // 3. GENTLE, ROLLING MEADOW FOOTHILLS (Low, broad, organic terrain seamlessly cradling the valley)
     const boulderMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.90, flatShading: true });
     const flowerYellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
     const flowerWhiteMat  = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
 
-    for (let f = 0; f < 22; f++) {
-      const angle = (f / 22) * Math.PI * 2;
-      const isNorth = Math.sin(angle) < -0.15;
-      const dist = isNorth ? 80 + (f % 2) * 5 : 65 + (f % 2) * 5;
+    // 14 gentle, wide rolling foothills pushed back to distance 84m - 96m
+    for (let f = 0; f < 14; f++) {
+      const angle = (f / 14) * Math.PI * 2;
+      const isNorth = Math.sin(angle) < -0.2;
+      const dist = isNorth ? 90 + (f % 2) * 5 : 84 + (f % 2) * 6;
       const fx = Math.cos(angle) * dist;
       const fz = Math.sin(angle) * dist;
-      const fr = isNorth ? 20 + (f % 3) * 3 : 24 + (f % 3) * 3;
-      const fh = 11 + (f % 2) * 3.5;
+      const fr = 40 + (f % 3) * 5;  // Broad base (radius 40m - 50m)
+      const fh = 3.4 + (f % 3) * 0.7; // Low crest (height 3.4m - 4.8m)
 
-      const hillGeo = this.buildMoraineFoothillGeo(fr, fh, 16, 8, isNorth);
-      const hillMesh = new THREE.Mesh(hillGeo, foothillMoraineMat);
+      const hillGeo = this.buildRollingFoothillGeo(fr, fh, 24, 12);
+      const hillMesh = new THREE.Mesh(hillGeo, foothillMat);
       hillMesh.position.set(fx, 0, fz);
-      hillMesh.rotation.y = angle + 0.3;
+      hillMesh.rotation.y = angle + 0.2;
       hillMesh.receiveShadow = true;
       this.scene.add(hillMesh);
 
-      // Natural weathered boulder clusters at base of foothill
+      // Natural weathered boulder clusters at foothill base
       if (f % 2 === 0) {
         const bGroup = new THREE.Group();
-        const bDist = dist - fr * 0.45;
+        const bDist = dist - fr * 0.40;
         bGroup.position.set(Math.cos(angle) * bDist, 0, Math.sin(angle) * bDist);
 
-        for (let b = 0; b < 3; b++) {
-          const bSize = 0.8 + (b * 0.4);
+        for (let b = 0; b < 2; b++) {
+          const bSize = 0.7 + (b * 0.3);
           const bMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(bSize, 1), boulderMat);
-          bMesh.scale.set(1.2, 0.75, 1.0);
-          bMesh.position.set((b - 1) * 1.2, bSize * 0.4, (b % 2) * 0.6);
+          bMesh.scale.set(1.2, 0.70, 1.0);
+          bMesh.position.set((b - 0.5) * 1.1, bSize * 0.35, (b % 2) * 0.5);
           bMesh.rotation.set(b * 0.5, b * 0.8, b * 0.3);
           bMesh.receiveShadow = true;
           bGroup.add(bMesh);
         }
 
         // Wildflower blossoms accenting boulder bases
-        for (let fl = 0; fl < 4; fl++) {
+        for (let fl = 0; fl < 3; fl++) {
           const flMat = (fl % 2 === 0) ? flowerYellowMat : flowerWhiteMat;
-          const flMesh = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.32, 5), flMat);
-          flMesh.position.set(Math.cos(fl * 1.5) * 1.8, 0.16, Math.sin(fl * 1.5) * 1.8);
+          const flMesh = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.28, 5), flMat);
+          flMesh.position.set(Math.cos(fl * 2.0) * 1.5, 0.14, Math.sin(fl * 2.0) * 1.5);
           bGroup.add(flMesh);
         }
 
@@ -2297,102 +2340,235 @@ export class World {
   }
 
   /**
-   * Generates a multi-blade tapered grass cluster with vertex-baked root-to-tip colors.
+   * Generates a curved multi-blade tapered grass cluster with natural arching
+   * and vertex-baked root-to-tip color gradients, eliminating rigid spike-like triangles.
    */
   buildGrassClusterGeo() {
     const positions = [];
     const colors = [];
-    const bladeCount = 7;
-    const cRoot = new THREE.Color(0x1a3d24);
-    const cTip = new THREE.Color(0x84cc16);
+    const indices = [];
+
+    const bladeCount = 8;
+    const cRoot = new THREE.Color(0x1d4224); // Rich deep meadow root green
+    const cMid  = new THREE.Color(0x4d9b38); // Natural vibrant pasture green
+    const cTip  = new THREE.Color(0x92d13d); // Sunlit fresh green-gold tip
+
+    let vertOffset = 0;
 
     for (let b = 0; b < bladeCount; b++) {
-      const angle = (b / bladeCount) * Math.PI * 2 + (Math.sin(b * 1.7) * 0.2);
-      const h = 0.45 + (b % 3) * 0.08;
-      const lean = 0.14 + (b % 2) * 0.06;
-      const baseW = 0.035;
+      const angle = (b / bladeCount) * Math.PI * 2 + (Math.sin(b * 1.8) * 0.25);
+      const h = 0.36 + (b % 4) * 0.06; // Varied heights (0.36m - 0.54m)
+      const leanDist = 0.12 + (b % 3) * 0.05; // Natural outward arching
+      const baseW = 0.024; // Thinner blade base
+      const midW  = 0.015; // Tapered mid-blade width
 
       const cosA = Math.cos(angle);
       const sinA = Math.sin(angle);
       const perpX = -sinA * baseW;
-      const perpZ = cosA * baseW;
+      const perpZ =  cosA * baseW;
 
-      const baseOffset = 0.025;
-      const bx = cosA * baseOffset;
-      const bz = sinA * baseOffset;
+      const midPerpX = -sinA * midW;
+      const midPerpZ =  cosA * midW;
 
-      const tx = bx + cosA * lean;
+      // Base vertices (Tier 0: y = 0)
+      const bx = cosA * 0.02;
+      const bz = sinA * 0.02;
+
+      // Mid vertices (Tier 1: y = h * 0.55, arched outward)
+      const mx = bx + cosA * (leanDist * 0.42);
+      const my = h * 0.55;
+      const mz = bz + sinA * (leanDist * 0.42);
+
+      // Tip vertex (Tier 2: y = h, arching down slightly)
+      const tx = bx + cosA * leanDist;
       const ty = h;
-      const tz = bz + sinA * lean;
+      const tz = bz + sinA * leanDist;
 
+      // 5 Vertices per curved blade:
+      // 0: Base Left, 1: Base Right, 2: Mid Left, 3: Mid Right, 4: Tip
       positions.push(bx + perpX, 0.0, bz + perpZ);
       colors.push(cRoot.r, cRoot.g, cRoot.b);
 
       positions.push(bx - perpX, 0.0, bz - perpZ);
       colors.push(cRoot.r, cRoot.g, cRoot.b);
 
+      positions.push(mx + midPerpX, my, mz + midPerpZ);
+      colors.push(cMid.r, cMid.g, cMid.b);
+
+      positions.push(mx - midPerpX, my, mz - midPerpZ);
+      colors.push(cMid.r, cMid.g, cMid.b);
+
       positions.push(tx, ty, tz);
       colors.push(cTip.r, cTip.g, cTip.b);
+
+      // Triangles for 2-segment strip
+      const v = vertOffset;
+      // Lower quad: (0, 2, 1) and (1, 2, 3)
+      indices.push(v + 0, v + 2, v + 1);
+      indices.push(v + 1, v + 2, v + 3);
+      // Upper tip triangle: (2, 4, 3)
+      indices.push(v + 2, v + 4, v + 3);
+
+      vertOffset += 5;
     }
 
-    const geo = new THREE.BufferGeometry();
+    let geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.setIndex(indices);
+    geo = geo.toNonIndexed();
     geo.computeVertexNormals();
     return geo;
   }
 
   /**
-   * Generates a stylized wildflower geometry with green stem and colored blossom petals.
+   * Generates recognizable stylized alpine wildflowers:
+   * - Alpine Poppy: slender green stem, flared 5-petal cup, and dark center pistil
+   * - Golden Buttercup: 5 rounded sunny yellow petals with warm gold core
+   * - Meadow Lavender: 3-tier purple floral whorl spire
    */
-  buildFlowerGeo(petalColorHex) {
-    let stemGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.30, 4);
-    stemGeo.translate(0, 0.15, 0);
-    stemGeo = stemGeo.toNonIndexed();
+  buildFlowerGeo(flowerType, petalColorHex) {
+    const positions = [];
+    const colors = [];
+    const indices = [];
 
-    let blossomGeo = new THREE.CylinderGeometry(0.08, 0.04, 0.05, 6);
-    blossomGeo.translate(0, 0.32, 0);
-    blossomGeo = blossomGeo.toNonIndexed();
-
-    const posStem = stemGeo.getAttribute('position');
-    const posBlossom = blossomGeo.getAttribute('position');
-    const totalCount = posStem.count + posBlossom.count;
-
-    const positions = new Float32Array(totalCount * 3);
-    const colors = new Float32Array(totalCount * 3);
-    const cStem = new THREE.Color(0x2e7d32);
+    const cStem = new THREE.Color(0x2d6a31);
     const cPetal = new THREE.Color(petalColorHex);
+    const cDarkCenter = new THREE.Color(0x1c1917);
+    const cGoldCenter = new THREE.Color(0xd97706);
+    const cLavenderTip = new THREE.Color(0xc084fc);
 
-    for (let i = 0; i < posStem.count; i++) {
-      positions[i * 3] = posStem.getX(i);
-      positions[i * 3 + 1] = posStem.getY(i);
-      positions[i * 3 + 2] = posStem.getZ(i);
-      colors[i * 3] = cStem.r;
-      colors[i * 3 + 1] = cStem.g;
-      colors[i * 3 + 2] = cStem.b;
+    let vIdx = 0;
+
+    // 1. Stem (Slender 4-sided tapered cylinder)
+    const stemH = flowerType === 'lavender' ? 0.38 : (flowerType === 'buttercup' ? 0.28 : 0.34);
+    const stemR = 0.012;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      const x = Math.cos(a) * stemR;
+      const z = Math.sin(a) * stemR;
+      positions.push(x, 0, z);
+      colors.push(cStem.r, cStem.g, cStem.b);
+      positions.push(x * 0.8, stemH, z * 0.8);
+      colors.push(cStem.r, cStem.g, cStem.b);
     }
-    const offset = posStem.count;
-    for (let i = 0; i < posBlossom.count; i++) {
-      const idx = (offset + i) * 3;
-      positions[idx] = posBlossom.getX(i);
-      positions[idx + 1] = posBlossom.getY(i);
-      positions[idx + 2] = posBlossom.getZ(i);
-      colors[idx] = cPetal.r;
-      colors[idx + 1] = cPetal.g;
-      colors[idx + 2] = cPetal.b;
+    for (let i = 0; i < 4; i++) {
+      const nextI = (i + 1) % 4;
+      const i0 = vIdx + i * 2;
+      const i1 = vIdx + nextI * 2;
+      const i2 = vIdx + i * 2 + 1;
+      const i3 = vIdx + nextI * 2 + 1;
+      indices.push(i0, i2, i1);
+      indices.push(i1, i2, i3);
+    }
+    vIdx += 8;
+
+    if (flowerType === 'poppy') {
+      // 5 Flared crimson cup petals
+      const petalCount = 5;
+      const petalR = 0.12;
+      const baseY = stemH;
+      const tipY = stemH + 0.08;
+
+      // Dark pistil center
+      positions.push(0, baseY + 0.02, 0);
+      colors.push(cDarkCenter.r, cDarkCenter.g, cDarkCenter.b);
+      const centerV = vIdx++;
+
+      for (let p = 0; p < petalCount; p++) {
+        const a1 = (p / petalCount) * Math.PI * 2;
+        const a2 = ((p + 0.85) / petalCount) * Math.PI * 2;
+        const aMid = (a1 + a2) * 0.5;
+
+        const x1 = Math.cos(a1) * 0.03;
+        const z1 = Math.sin(a1) * 0.03;
+        const x2 = Math.cos(a2) * 0.03;
+        const z2 = Math.sin(a2) * 0.03;
+
+        const tx = Math.cos(aMid) * petalR;
+        const tz = Math.sin(aMid) * petalR;
+
+        positions.push(x1, baseY, z1);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+        positions.push(x2, baseY, z2);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+        positions.push(tx, tipY, tz);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+
+        const pV = vIdx;
+        indices.push(pV, pV + 2, pV + 1);
+        indices.push(centerV, pV, pV + 1);
+        vIdx += 3;
+      }
+    } else if (flowerType === 'buttercup') {
+      // 5 Rounded sunny yellow petals
+      const petalCount = 5;
+      const petalR = 0.095;
+      const baseY = stemH;
+
+      positions.push(0, baseY + 0.015, 0);
+      colors.push(cGoldCenter.r, cGoldCenter.g, cGoldCenter.b);
+      const centerV = vIdx++;
+
+      for (let p = 0; p < petalCount; p++) {
+        const a1 = (p / petalCount) * Math.PI * 2;
+        const a2 = ((p + 0.82) / petalCount) * Math.PI * 2;
+        const aMid = (a1 + a2) * 0.5;
+
+        const tx = Math.cos(aMid) * petalR;
+        const tz = Math.sin(aMid) * petalR;
+
+        positions.push(Math.cos(a1) * 0.025, baseY, Math.sin(a1) * 0.025);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+        positions.push(Math.cos(a2) * 0.025, baseY, Math.sin(a2) * 0.025);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+        positions.push(tx, baseY + 0.04, tz);
+        colors.push(cPetal.r, cPetal.g, cPetal.b);
+
+        const pV = vIdx;
+        indices.push(pV, pV + 2, pV + 1);
+        indices.push(centerV, pV, pV + 1);
+        vIdx += 3;
+      }
+    } else {
+      // Lavender: 3 stacked tiers of purple floral whorls
+      const whorlTiers = 3;
+      for (let t = 0; t < whorlTiers; t++) {
+        const ty = stemH - 0.06 + t * 0.045;
+        const tr = 0.045 - t * 0.008;
+        const tColor = t === 2 ? cLavenderTip : cPetal;
+
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + (t * 0.4);
+          const x = Math.cos(a) * tr;
+          const z = Math.sin(a) * tr;
+
+          positions.push(x * 0.3, ty, z * 0.3);
+          colors.push(tColor.r, tColor.g, tColor.b);
+          positions.push(x, ty + 0.025, z);
+          colors.push(tColor.r, tColor.g, tColor.b);
+          positions.push(0, ty + 0.045, 0);
+          colors.push(cLavenderTip.r, cLavenderTip.g, cLavenderTip.b);
+
+          indices.push(vIdx, vIdx + 1, vIdx + 2);
+          vIdx += 3;
+        }
+      }
     }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    let geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.setIndex(indices);
+    geo = geo.toNonIndexed();
     geo.computeVertexNormals();
     return geo;
   }
 
   /**
    * Layered 3D Grass Tufts, Wildflowers, and Low-Poly Shrubbery
-   * Upgraded with 1,400 multi-blade tapered grass clusters driven by onBeforeCompile GPU wind sway,
-   * 280 instanced alpine wildflowers, weathered river stones, and handcrafted Blender shrub bushes.
+   * Upgraded with 2,200 curved multi-segment grass clusters driven by asynchronous GPU wind sway,
+   * 330 recognizable botanical wildflowers, weathered river stones, and handcrafted Blender shrub bushes.
    */
   buildVegetationLayers() {
     let seed = 1234567;
@@ -2401,10 +2577,10 @@ export class World {
       return seed / 233280;
     };
 
-    // 1. GPU-Animated 3D Grass Clusters (1,400 multi-blade tapered clusters)
+    // 1. GPU-Animated 3D Grass Clusters (2,200 curved multi-blade clusters with natural drift patches)
     const grassLocations = [];
     let attempts = 0;
-    while (grassLocations.length < 1400 && attempts < 10000) {
+    while (grassLocations.length < 2200 && attempts < 16000) {
       attempts++;
       const x = (pseudoRandom() - 0.5) * 84;
       const z = (pseudoRandom() - 0.5) * 80 + 1;
@@ -2413,7 +2589,7 @@ export class World {
       grassLocations.push({
         x, y, z,
         rotY: pseudoRandom() * Math.PI * 2,
-        scale: 0.75 + pseudoRandom() * 0.45
+        scale: 0.80 + pseudoRandom() * 0.40
       });
     }
 
@@ -2431,19 +2607,24 @@ export class World {
         '#include <begin_vertex>',
         `
         #include <begin_vertex>
-        float heightFactor = clamp(transformed.y * 1.8, 0.0, 1.0);
+        float heightFactor = clamp(transformed.y * 1.85, 0.0, 1.0);
         heightFactor = heightFactor * heightFactor;
         #ifdef USE_INSTANCEMATRIX
           vec4 worldInstancePos = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-          float wave = sin(uTime * 2.2 + worldInstancePos.x * 0.35 + worldInstancePos.z * 0.28);
-          float waveGust = cos(uTime * 1.4 + worldInstancePos.x * 0.15 - worldInstancePos.z * 0.45);
+          float phase = worldInstancePos.x * 0.42 + worldInstancePos.z * 0.36;
+          float wave = sin(uTime * 2.4 + phase);
+          float gust = cos(uTime * 1.3 + phase * 0.5 - worldInstancePos.z * 0.3);
+          float flutter = sin(uTime * 4.6 + phase * 1.4) * 0.20;
         #else
-          float wave = sin(uTime * 2.2 + position.x * 0.35 + position.z * 0.28);
-          float waveGust = cos(uTime * 1.4 + position.x * 0.15 - position.z * 0.45);
+          float phase = position.x * 0.42 + position.z * 0.36;
+          float wave = sin(uTime * 2.4 + phase);
+          float gust = cos(uTime * 1.3 + phase * 0.5 - position.z * 0.3);
+          float flutter = sin(uTime * 4.6 + phase * 1.4) * 0.20;
         #endif
-        float windDisplacement = (wave * 0.12 + waveGust * 0.06) * heightFactor;
-        transformed.x += windDisplacement;
-        transformed.z += windDisplacement * 0.65;
+        float windX = (wave * 0.13 + gust * 0.06 + flutter * 0.03) * heightFactor;
+        float windZ = (wave * 0.08 - gust * 0.04) * heightFactor;
+        transformed.x += windX;
+        transformed.z += windZ;
         `
       );
     };
@@ -2461,24 +2642,24 @@ export class World {
     instancedGrass.instanceMatrix.needsUpdate = true;
     this.scene.add(instancedGrass);
 
-    // 2. Instanced Wildflowers (Alpine Poppies, Golden Buttercups, Meadow Lavender)
+    // 2. Instanced Wildflowers (Alpine Poppies, Golden Buttercups, Meadow Lavender - 110 of each)
     const flowerTypes = [
-      { name: 'poppy', color: 0xef4444, count: 95 },
-      { name: 'buttercup', color: 0xfacc15, count: 95 },
-      { name: 'lavender', color: 0xa855f7, count: 90 }
+      { name: 'poppy', color: 0xef4444, count: 110 },
+      { name: 'buttercup', color: 0xfacc15, count: 110 },
+      { name: 'lavender', color: 0xa855f7, count: 110 }
     ];
 
     const flowerMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.70,
-      metalness: 0.05
+      roughness: 0.68,
+      metalness: 0.04
     });
 
     flowerTypes.forEach(ft => {
-      const flowerGeo = this.buildFlowerGeo(ft.color);
+      const flowerGeo = this.buildFlowerGeo(ft.name, ft.color);
       const flowerLocs = [];
       let fAttempts = 0;
-      while (flowerLocs.length < ft.count && fAttempts < 5000) {
+      while (flowerLocs.length < ft.count && fAttempts < 6000) {
         fAttempts++;
         const x = (pseudoRandom() - 0.5) * 82;
         const z = (pseudoRandom() - 0.5) * 78 + 1;
@@ -2487,7 +2668,7 @@ export class World {
         flowerLocs.push({
           x, y, z,
           rotY: pseudoRandom() * Math.PI * 2,
-          scale: 0.75 + pseudoRandom() * 0.45
+          scale: 0.80 + pseudoRandom() * 0.40
         });
       }
 

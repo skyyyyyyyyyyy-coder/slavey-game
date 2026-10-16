@@ -150,35 +150,48 @@ async function run() {
     await new Promise(r => setTimeout(r, 500));
   }
 
-  // CAPTURE 1: Midday 12:00 Panoramic Valley (Farmhouse, meadow grass, layered mountains, cumulus clouds)
+  // CAPTURE 1: Midday 12:00 Panoramic Valley (Looking North: Farmhouse, fields, rolling foothills, towering snow peaks)
   await setTime(12.0);
-  await setCamera({ x: 0.0, y: 7.5, z: 28.0 }, Math.PI, -0.18);
+  await setCamera({ x: 0.0, y: 2.0, z: 18.0 }, 0.0, 0.04);
   await capture('stage2_01_midday_panoramic_valley.png');
 
-  // CAPTURE 2: Golden Hour 17:00 (Warm low-angle light over orchard and meadow)
+  // CAPTURE 2: Golden Hour 17:00 (Warm low-angle light over orchard, split-rail fences, and meadow)
   await setTime(17.0);
-  await setCamera({ x: 12.0, y: 3.2, z: 12.0 }, -1.0, -0.12);
+  await setCamera({ x: 12.0, y: 1.8, z: 12.0 }, -1.0, -0.06);
   await capture('stage2_02_goldenhour_orchard_meadow.png');
 
-  // CAPTURE 3: Sunset 18:30 (Rich apricot/salmon/violet layered sky, glowing windows, western massifs)
+  // CAPTURE 3: Sunset 18:30 (Soft peach-rose-indigo alpenglow, glowing windows, western massifs)
   await setTime(18.5);
-  await setCamera({ x: 18.0, y: 3.5, z: -10.0 }, 1.35, -0.05);
+  await setCamera({ x: 16.0, y: 1.8, z: -10.0 }, 1.35, -0.02);
   await capture('stage2_03_sunset_mountain_ridge.png');
 
-  // CAPTURE 4: Night 22:30 (Starry sky, moonlit sculpted clouds, cozy lantern and glowing hearth)
+  // CAPTURE 4: Night 22:30 (Starry sky, translucent moonlit clouds, cozy lantern and glowing hearth)
   await setTime(22.5);
-  await setCamera({ x: 0.0, y: 3.2, z: -16.0 }, Math.PI, 0.15);
+  await setCamera({ x: 0.0, y: 1.8, z: -16.0 }, 0.0, 0.12);
   await capture('stage2_04_night_starfield_clouds.png');
 
   // CAPTURE 5: Morning 08:00 North Alpine Massifs (Crisp arêtes, couloir snow drifts, rolling moraine foothills)
   await setTime(8.0);
-  await setCamera({ x: -14.0, y: 4.5, z: 2.0 }, Math.PI - 0.2, 0.08);
+  await setCamera({ x: 0.0, y: 1.8, z: -20.0 }, 0.0, 0.10);
   await capture('stage2_05_north_alpine_horizon.png');
 
-  // CAPTURE 6: Meadow Ground Close-up (3D tapered grass blades, Alpine Poppies, Buttercups, Lavender, River Pebbles)
+  // CAPTURE 6: Meadow Ground Close-up (3D tapered curved grass blades, Alpine Poppies, Buttercups, Lavender, River Pebbles)
   await setTime(12.0);
   await setCamera({ x: -12.0, y: 1.2, z: 2.0 }, 0.8, -0.65);
   await capture('stage2_06_close_grass_wildflowers.png');
+
+  // CAPTURE 7: Farming Hoe Selector & Soil Visuals (Verifies refined bracket styling & arable soil)
+  await setTime(12.0);
+  await setCamera({ x: -16.0, y: 1.6, z: -11.0 }, 0, -0.65);
+  await send('Runtime.evaluate', {
+    expression: `(() => {
+      if (window.farmingManager) {
+        window.farmingManager.activeTool = 'hoe';
+      }
+    })()`
+  });
+  await new Promise(r => setTimeout(r, 400));
+  await capture('stage2_07_farming_selector_and_soil.png');
 
   // Measure FPS over 60 rendered frames
   const fpsRes = await send('Runtime.evaluate', {

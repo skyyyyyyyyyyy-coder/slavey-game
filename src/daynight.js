@@ -13,7 +13,7 @@ import { events } from './events.js';
  * - 22:30 Night: Deep midnight navy with subtle stars, soft moonlight, and cozy visibility (preserved)
  */
 const KEYFRAMES = [
-  // 04:00 - Deep Pre-Dawn Night
+  // 04:00 - Deep Pre-Dawn Night (Readable dark areas, moonlit silhouettes, translucent clouds)
   {
     hour: 4.0,
     sunX: 180,
@@ -21,25 +21,25 @@ const KEYFRAMES = [
     sunZ: -10,
     sunIntensity: 0.0,
     sunColor: 0xffa055,
-    moonIntensity: 0.44,
+    moonIntensity: 0.42,
     moonColor: 0x93c5fd,
     hemiSky: 0x18233c,
-    hemiGround: 0x090e18,
-    hemiIntensity: 0.40,
+    hemiGround: 0x0d1424,
+    hemiIntensity: 0.42,
     ambientColor: 0x1e293b,
     ambientIntensity: 0.35,
     fogColor: 0x0f172a,      // Deep midnight slate
-    fogDensity: 0.0032,
+    fogDensity: 0.0028,
     skyZenith: 0x020617,     // Cosmic obsidian
     skyMid: 0x0b1329,        // Midnight navy
     skyLow: 0x151c33,        // Deep slate navy
     skyHorizon: 0x1e293b,    // Midnight horizon rim
-    cloudColor: 0x0f172a,    // Silhouette clouds
-    cloudOpacity: 0.38,
+    cloudColor: 0x475569,    // Soft moonlit slate translucent clouds (NO BLACK BLOBS)
+    cloudOpacity: 0.28,
     starOpacity: 0.95,
     windowGlow: 0.98,
     lanternIntensity: 1.65,
-    exposure: 0.96
+    exposure: 0.98
   },
 
   // 05:30 - Early Dawn Light
@@ -58,13 +58,13 @@ const KEYFRAMES = [
     ambientColor: 0x4338ca,
     ambientIntensity: 0.30,
     fogColor: 0x475569,      // Lavender-slate dawn mist
-    fogDensity: 0.0044,
+    fogDensity: 0.0038,
     skyZenith: 0x0f172a,
     skyMid: 0x1e1b4b,
     skyLow: 0x4338ca,
     skyHorizon: 0xf43f5e,    // Rose-coral dawn horizon
-    cloudColor: 0x64748b,
-    cloudOpacity: 0.65,
+    cloudColor: 0x94a3b8,
+    cloudOpacity: 0.55,
     starOpacity: 0.55,
     windowGlow: 0.70,
     lanternIntensity: 1.15,
@@ -78,26 +78,26 @@ const KEYFRAMES = [
     sunY: 14,
     sunZ: -12,
     sunIntensity: 1.30,
-    sunColor: 0xffa055,      // Warm peach sunrise sun
+    sunColor: 0xfdba74,      // Warm soft peach sunrise sun
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
     hemiSky: 0x3b82f6,       // Cooler morning sky bounce
-    hemiGround: 0x65a30d,    // Fresh morning grass
+    hemiGround: 0x4d7c2f,    // Fresh morning grass (natural olive)
     hemiIntensity: 0.72,
     ambientColor: 0xfed7aa,  // Warm peach ambient fill
     ambientIntensity: 0.26,
     fogColor: 0xfed7aa,      // Warm golden apricot morning mist
-    fogDensity: 0.0050,      // Subtle dawn mist near the ground
+    fogDensity: 0.0042,      // Subtle dawn mist near the ground
     skyZenith: 0x1e3a8a,     // Cooler deep blue upper sky
     skyMid: 0x38bdf8,        // Clean morning azure mid sky
     skyLow: 0x60a5fa,        // Transition azure band
     skyHorizon: 0xfdba74,    // Radiant warm golden peach / apricot horizon
-    cloudColor: 0xfed7aa,    // Sunrise illuminated clouds
-    cloudOpacity: 0.88,
+    cloudColor: 0xfef08a,    // Sunrise soft golden-illuminated clouds
+    cloudOpacity: 0.82,
     starOpacity: 0.0,
     windowGlow: 0.20,
     lanternIntensity: 0.20,
-    exposure: 1.08
+    exposure: 1.06
   },
 
   // 08:00 - Morning (Warm Buttery Gold, Distinct from Noon, Medium-Long Shadows & Fresh Valley Air)
@@ -111,25 +111,25 @@ const KEYFRAMES = [
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
     hemiSky: 0x7dd3fc,       // Fresh sky blue
-    hemiGround: 0x4ade80,    // Fresh morning green
+    hemiGround: 0x3d7023,    // Fresh morning natural green
     hemiIntensity: 0.86,
     ambientColor: 0xfef9c3,  // Warm soft light fill
     ambientIntensity: 0.27,
     fogColor: 0xdbeafe,      // Fresh alpine morning mist
-    fogDensity: 0.0036,      // Clean fresh valley air
+    fogDensity: 0.0030,      // Clean fresh valley air
     skyZenith: 0x1d4ed8,     // Royal blue
     skyMid: 0x38bdf8,        // Clean morning blue
     skyLow: 0x93c5fd,        // Azure haze
     skyHorizon: 0xfef08a,    // Buttery gold horizon band
-    cloudColor: 0xfffbeb,    // Warm creamy white clouds
-    cloudOpacity: 0.94,
+    cloudColor: 0xf8fafc,    // Warm soft white clouds
+    cloudOpacity: 0.90,
     starOpacity: 0.0,
     windowGlow: 0.08,
     lanternIntensity: 0.0,
-    exposure: 1.06
+    exposure: 1.05
   },
 
-  // 12:00 - Midday (Crisp Daylight & Clean Blue Sky - Preserved)
+  // 12:00 - Midday (Crisp Daylight, Clean Blue Sky, Natural Ground Bounce without neon glow)
   {
     hour: 12.0,
     sunX: 10,
@@ -140,22 +140,22 @@ const KEYFRAMES = [
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
     hemiSky: 0x7dd3fc,       // High sky blue
-    hemiGround: 0x16a34a,    // True meadow green
-    hemiIntensity: 0.95,
+    hemiGround: 0x386624,    // Natural olive pasture green (NO NEON GLOW)
+    hemiIntensity: 0.88,
     ambientColor: 0xffffff,  // Clean white ambient fill
     ambientIntensity: 0.25,
     fogColor: 0xbae6fd,      // Crisp alpine mountain haze
-    fogDensity: 0.0028,      // Cleanest clarity for distant ranges
+    fogDensity: 0.0024,      // High clarity for distant snow massifs
     skyZenith: 0x1e40af,     // Deep zenith blue
     skyMid: 0x38bdf8,        // Clean sky blue
     skyLow: 0x7dd3fc,        // Alpine light blue
     skyHorizon: 0xbae6fd,    // Natural clear horizon haze
-    cloudColor: 0xffffff,    // Pure fluffy white clouds
-    cloudOpacity: 0.96,
+    cloudColor: 0xffffff,    // Pure soft white clouds
+    cloudOpacity: 0.92,
     starOpacity: 0.0,
     windowGlow: 0.05,
     lanternIntensity: 0.0,
-    exposure: 1.04
+    exposure: 1.02
   },
 
   // 15:30 - Late Afternoon Transition
@@ -169,22 +169,22 @@ const KEYFRAMES = [
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
     hemiSky: 0x60a5fa,
-    hemiGround: 0x22c55e,
-    hemiIntensity: 0.88,
+    hemiGround: 0x3d7023,
+    hemiIntensity: 0.86,
     ambientColor: 0xfef9c3,
     ambientIntensity: 0.26,
     fogColor: 0xcbe3fb,
-    fogDensity: 0.0032,
+    fogDensity: 0.0028,
     skyZenith: 0x1d4ed8,
     skyMid: 0x3b82f6,
     skyLow: 0x93c5fd,
     skyHorizon: 0xfef08a,
-    cloudColor: 0xfffbeb,
-    cloudOpacity: 0.94,
+    cloudColor: 0xf8fafc,
+    cloudOpacity: 0.90,
     starOpacity: 0.0,
     windowGlow: 0.10,
     lanternIntensity: 0.05,
-    exposure: 1.06
+    exposure: 1.05
   },
 
   // 17:00 - Golden Hour (Low-Angle Warm Sunlight, Rich Golden Highlights, Long Soft Shadows)
@@ -193,59 +193,59 @@ const KEYFRAMES = [
     sunX: -168,
     sunY: 28,
     sunZ: -18,
-    sunIntensity: 1.55,      // Strengthened low-angle warm sunlight
-    sunColor: 0xf59e0b,      // Rich deep golden amber
+    sunIntensity: 1.50,      // Low-angle warm sunlight
+    sunColor: 0xf59e0b,      // Rich warm golden amber
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
     hemiSky: 0x3b82f6,       // Cooler sky bounce above
-    hemiGround: 0x84cc16,    // Warm golden-lit grass bounce
-    hemiIntensity: 0.80,
+    hemiGround: 0x556e29,    // Natural golden-lit pasture green
+    hemiIntensity: 0.78,
     ambientColor: 0xfde68a,  // Warm golden ambient fill
-    ambientIntensity: 0.30,
-    fogColor: 0xfed7aa,      // Warm amber mountain haze
-    fogDensity: 0.0035,
-    skyZenith: 0x1e3a8a,     // Cooler deep cobalt upper sky
+    ambientIntensity: 0.28,
+    fogColor: 0xfde68a,      // Warm golden mountain haze
+    fogDensity: 0.0030,
+    skyZenith: 0x1e3a8a,     // Deep cobalt upper sky
     skyMid: 0x2563eb,        // Deepening azure
     skyLow: 0xf59e0b,        // Warm amber band
-    skyHorizon: 0xfbbf24,    // Radiant glowing golden horizon (warmer near horizon!)
-    cloudColor: 0xfde047,    // Richly sunlit golden clouds
-    cloudOpacity: 0.92,
+    skyHorizon: 0xfde68a,    // Soft radiant golden horizon
+    cloudColor: 0xfef3c7,    // Soft golden-lit clouds
+    cloudOpacity: 0.85,
     starOpacity: 0.0,
     windowGlow: 0.35,
     lanternIntensity: 0.35,
-    exposure: 1.15           // Rich golden highlights on farmhouse, crops, cobbles
+    exposure: 1.08
   },
 
-  // 18:30 - Sunset (Layered Gradient: Orange/Gold Horizon, Salmon Mid-Sky, Violet Upper Sky, NO FLAT PINK!)
+  // 18:30 - Sunset (Natural Alpine Alpenglow: Peach/Rose Horizon, Indigo Mid-Sky, Violet Zenith - NO FIERY NEON ORANGE)
   {
     hour: 18.5,
     sunX: -176,
     sunY: 13,
     sunZ: -10,
-    sunIntensity: 1.18,      // Low sunset ember above mountain rim
-    sunColor: 0xea580c,      // Rich sunset amber-orange
+    sunIntensity: 1.15,      // Low sunset ember above mountain rim
+    sunColor: 0xf59e0b,      // Soft warm amber (NOT harsh neon red/orange)
     moonIntensity: 0.0,
     moonColor: 0x93c5fd,
-    hemiSky: 0x3730a3,       // Deep indigo-violet upper sky bounce
-    hemiGround: 0x78350f,    // Warm earth bounce
-    hemiIntensity: 0.68,
-    ambientColor: 0xfed7aa,  // Warm peach-amber ambient (reduced pink saturation!)
-    ambientIntensity: 0.30,
-    fogColor: 0xfdba74,      // Warm sunset amber-peach mist (NOT HOT PINK!)
-    fogDensity: 0.0040,
-    skyZenith: 0x1e1b4b,     // Deep violet-blue upper sky
-    skyMid: 0x2e3875,        // Dusky violet/indigo
-    skyLow: 0xc06c84,        // Subtle, natural dusty salmon/rose band
-    skyHorizon: 0xf97316,    // Vibrant glowing orange / gold / peach horizon
-    cloudColor: 0xfba368,    // Layered sunset clouds with natural peach-coral tops
-    cloudOpacity: 0.86,
+    hemiSky: 0x312e81,       // Deep twilight indigo upper bounce
+    hemiGround: 0x3d3024,    // Natural muted warm earth (NOT blazing orange)
+    hemiIntensity: 0.65,
+    ambientColor: 0xfde68a,  // Soft warm amber ambient
+    ambientIntensity: 0.28,
+    fogColor: 0xfba368,      // Soft warm peach-apricot mist (blends with horizon)
+    fogDensity: 0.0030,
+    skyZenith: 0x1e1b4b,     // Deep twilight violet upper sky
+    skyMid: 0x4338ca,        // Dusky indigo
+    skyLow: 0xf472b6,        // Soft rose / peach band
+    skyHorizon: 0xfed7aa,    // Warm soft peach-gold horizon
+    cloudColor: 0xfed7aa,    // Soft rose-peach clouds
+    cloudOpacity: 0.65,
     starOpacity: 0.20,       // Early evening stars
-    windowGlow: 0.82,        // Chalet windows glowing warmly
+    windowGlow: 0.85,        // Farmhouse windows glowing warmly
     lanternIntensity: 1.35,  // Porch lantern ignited
-    exposure: 1.10           // Cinematic, warm, but natural
+    exposure: 1.04           // Cinematic, natural balance
   },
 
-  // 19:30 - Twilight (Dusty Violet / Lavender Slate, Reduced Blue Cast on Ground, Windows Stand Out!)
+  // 19:30 - Twilight (Dusty Violet / Lavender Slate, Clean Contrast, Glowing Windows)
   {
     hour: 19.5,
     sunX: -180,
@@ -253,28 +253,28 @@ const KEYFRAMES = [
     sunZ: -5,
     sunIntensity: 0.05,
     sunColor: 0x9a3412,
-    moonIntensity: 0.30,
+    moonIntensity: 0.32,
     moonColor: 0x93c5fd,
     hemiSky: 0x312e81,       // Dusky twilight purple
-    hemiGround: 0x1e293b,    // Muted slate earth (REDUCED BLUE CAST!)
+    hemiGround: 0x1e293b,    // Muted slate earth (REDUCED BLUE CAST)
     hemiIntensity: 0.50,
-    ambientColor: 0x3b4252,  // Neutral slate ambient fill (REDUCED BLUE CAST!)
+    ambientColor: 0x334155,  // Neutral slate ambient fill
     ambientIntensity: 0.34,
     fogColor: 0x475569,      // Dusty violet / slate twilight fog
-    fogDensity: 0.0036,
+    fogDensity: 0.0034,
     skyZenith: 0x0f172a,     // Deep slate navy
     skyMid: 0x312e81,        // Dusky indigo
     skyLow: 0x475569,        // Dusty slate band
     skyHorizon: 0x6b7280,    // Dusty lavender slate horizon rim
     cloudColor: 0x475569,    // Dusky twilight silhouette clouds
-    cloudOpacity: 0.65,
+    cloudOpacity: 0.50,
     starOpacity: 0.72,       // Stars sparkling across twilight sky
-    windowGlow: 0.98,        // Farmhouse windows POP OUT brightly!
+    windowGlow: 0.98,        // Farmhouse windows POP OUT brightly
     lanternIntensity: 1.65,  // Warm beacon on porch
-    exposure: 1.02
+    exposure: 1.00
   },
 
-  // 21:00 - Night Settling
+  // 21:00 - Night Settling (Deep navy, readable ground, moonlit silhouette)
   {
     hour: 21.0,
     sunX: -120,
@@ -288,22 +288,22 @@ const KEYFRAMES = [
     hemiGround: 0x0f172a,
     hemiIntensity: 0.45,
     ambientColor: 0x1e293b,
-    ambientIntensity: 0.36,
+    ambientIntensity: 0.35,
     fogColor: 0x1e293b,      // Deep slate navy
-    fogDensity: 0.0032,
+    fogDensity: 0.0030,
     skyZenith: 0x030712,
     skyMid: 0x0f172a,
     skyLow: 0x1e293b,
     skyHorizon: 0x1e3a8a,    // Deep midnight blue horizon
-    cloudColor: 0x1e293b,
-    cloudOpacity: 0.48,
+    cloudColor: 0x475569,    // Translucent night slate clouds
+    cloudOpacity: 0.35,
     starOpacity: 0.90,
     windowGlow: 0.96,
     lanternIntensity: 1.65,
     exposure: 0.98
   },
 
-  // 22:30 - Night (Deep Midnight Navy - Preserved)
+  // 22:30 - Night (Deep Midnight Navy, Soft Moonlight, Starfield Visible, Translucent Slate Clouds)
   {
     hour: 22.5,
     sunX: 0,
@@ -311,21 +311,21 @@ const KEYFRAMES = [
     sunZ: 20,
     sunIntensity: 0.0,
     sunColor: 0x9a3412,
-    moonIntensity: 0.46,
+    moonIntensity: 0.44,
     moonColor: 0x93c5fd,     // Cool silvery blue moonlight
     hemiSky: 0x172554,       // Deep navy sky fill
     hemiGround: 0x0a0f1d,    // Dark ground
     hemiIntensity: 0.42,
-    ambientColor: 0x1e293b,  // Cozy ambient visibility fill
-    ambientIntensity: 0.36,
+    ambientColor: 0x1e293b,  // Cozy ambient visibility fill (readable dark areas)
+    ambientIntensity: 0.35,
     fogColor: 0x0f172a,      // Midnight navy fog (clean silhouettes)
-    fogDensity: 0.0030,
+    fogDensity: 0.0028,
     skyZenith: 0x020617,     // Deepest midnight obsidian
     skyMid: 0x090d16,        // Dark celestial navy
     skyLow: 0x0f172a,        // Midnight indigo
     skyHorizon: 0x172554,    // Deep midnight blue horizon rim
-    cloudColor: 0x0f172a,    // Dark translucent silhouettes
-    cloudOpacity: 0.40,
+    cloudColor: 0x475569,    // Soft translucent slate clouds (NO BLACK DISCS BLOTTING OUT STARS)
+    cloudOpacity: 0.30,
     starOpacity: 0.98,       // Full twinkling starfield
     windowGlow: 0.98,        // Chalet windows glowing cozy gold
     lanternIntensity: 1.65,  // Porch lantern burning warmly
@@ -466,7 +466,6 @@ export class DayNightCycle {
     this.skyTexture = new THREE.CanvasTexture(this.skyCanvas);
 
     const skyGeo = new THREE.SphereGeometry(360, 32, 24);
-    skyGeo.scale(-1, 1, 1);
     const skyMat = new THREE.MeshBasicMaterial({
       map: this.skyTexture,
       side: THREE.BackSide,

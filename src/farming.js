@@ -170,16 +170,26 @@ export class FarmingManager {
       selectorValid: new THREE.MeshBasicMaterial({
         color: 0x22c55e,
         transparent: true,
-        opacity: 0.45,
+        opacity: 0.18,
         depthWrite: false,
         side: THREE.DoubleSide
       }),
       selectorInvalid: new THREE.MeshBasicMaterial({
         color: 0xef4444,
         transparent: true,
-        opacity: 0.45,
+        opacity: 0.08,
         depthWrite: false,
         side: THREE.DoubleSide
+      }),
+      selectorBorderValid: new THREE.LineBasicMaterial({
+        color: 0x4ade80,
+        transparent: true,
+        opacity: 0.75
+      }),
+      selectorBorderInvalid: new THREE.LineBasicMaterial({
+        color: 0xf87171,
+        transparent: true,
+        opacity: 0.55
       }),
       // Crop Foliage & Produce Materials
       leafSprout: new THREE.MeshStandardMaterial({ color: 0x68d391, roughness: 0.65 }),
@@ -208,7 +218,7 @@ export class FarmingManager {
     const edges = new THREE.EdgesGeometry(geo);
     this.selectorBorder = new THREE.LineSegments(
       edges,
-      new THREE.LineBasicMaterial({ color: 0xffffff, linewidth: 2 })
+      this.materials.selectorBorderValid
     );
     this.selectorBorder.rotateX(-Math.PI / 2);
     this.selectorBorder.position.set(0, 0.036, 0);
@@ -678,6 +688,7 @@ export class FarmingManager {
       this.selectorMesh.visible = true;
 
       this.selectorBorder.position.set(gx, 0.036, gz);
+      this.selectorBorder.material = valid ? this.materials.selectorBorderValid : this.materials.selectorBorderInvalid;
       this.selectorBorder.visible = true;
     } else {
       this.targetedTile = null;
