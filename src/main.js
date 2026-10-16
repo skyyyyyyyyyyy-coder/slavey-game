@@ -727,9 +727,17 @@ if (urlParams.get('cam') === 'garden') {
   player.yaw = -1.57;
   player.pitch = -0.42;
 } else if (urlParams.get('cam') === 'boundary-north') {
-  player.respawn(new THREE.Vector3(0, 1.4, -36.0));
-  player.yaw = 0.0;
-  player.pitch = 0.15;
+  player.respawn(new THREE.Vector3(-18.0, 1.6, -28.0));
+  player.yaw = -0.55;
+  player.pitch = 0.12;
+} else if (urlParams.get('cam') === 'spruce-closeup') {
+  player.respawn(new THREE.Vector3(22.0, 1.4, -31.5));
+  player.yaw = 0.18;
+  player.pitch = 0.28;
+} else if (urlParams.get('cam') === 'spruce-lineup') {
+  player.respawn(new THREE.Vector3(26.0, 1.5, -15.0));
+  player.yaw = -1.35;
+  player.pitch = 0.18;
 } else if (urlParams.get('cam') === 'boundary-feedback') {
   player.respawn(new THREE.Vector3(-2.8, 1.2, 3.0));
   player.yaw = -1.57;

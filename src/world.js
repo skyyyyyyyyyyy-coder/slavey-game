@@ -2088,12 +2088,24 @@ export class World {
       { x: -39.0, z: 34.5,  scale: 1.00 }
     ];
 
+    const spruceVariantUrls = [
+      '/models/tree_spruce.glb',
+      '/models/tree_spruce_slender.glb',
+      '/models/tree_spruce_broad.glb'
+    ];
+    const spruceTintFactors = [
+      new THREE.Color(1.00, 1.00, 1.00), // Palette 0: Classic Alpine Emerald
+      new THREE.Color(0.92, 1.02, 1.06), // Palette 1: Cool Glaucous Blue-Spruce
+      new THREE.Color(1.06, 1.03, 0.92)  // Palette 2: Sun-Warm Meadow Conifer
+    ];
+    const spruceMatCache = new Map();
+
     spruceLocations.forEach((p, pIdx) => {
       if (!this.isTreePositionValid(p.x, p.z)) {
         console.warn(`⚠️ [World] Spruce Tree #${pIdx} at (${p.x}, ${p.z}) failed spatial validation`);
       }
       const pineGroup = new THREE.Group();
-      const baseY = this.getGroundElevation(p.x, p.z);
+      const baseY = this.getGroundElevation ? this.getGroundElevation(p.x, p.z) : 0;
       pineGroup.position.set(p.x, baseY, p.z);
       const rotY = (pseudoRand(pIdx * 43.3 + 12.7) - 0.5) * Math.PI * 2;
       pineGroup.rotation.y = rotY;
@@ -2110,17 +2122,51 @@ export class World {
       );
       this.world.colliders.push({ box: pBox, mesh: pineGroup, type: 'solid', isCylinder: true });
 
-      // Asynchronously instantiate Blender Spruce model
-      assetPipeline.loadModel('/models/tree_spruce.glb', { collision: 'none' }).then(res => {
+      // Select variant deterministically by tree index (with automatic fallback to tree_spruce.glb)
+      const variantUrl = spruceVariantUrls[pIdx % spruceVariantUrls.length];
+      const loadSpruceVariant = (url) => assetPipeline.loadModel(url, { collision: 'none' }).catch(() => {
+        if (url !== '/models/tree_spruce.glb') {
+          return assetPipeline.loadModel('/models/tree_spruce.glb', { collision: 'none' });
+        }
+        return null;
+      });
+
+      loadSpruceVariant(variantUrl).then(res => {
         if (res && res.model) {
           const m = res.model.clone(true);
-          m.scale.set(p.scale, p.scale, p.scale);
+          // Organic non-uniform scale variation for unique silhouettes
+          const sx = p.scale * (0.94 + pseudoRand(pIdx * 17.1) * 0.14);
+          const sy = p.scale * (0.92 + pseudoRand(pIdx * 23.7) * 0.18);
+          const sz = p.scale * (0.94 + pseudoRand(pIdx * 31.3) * 0.14);
+          m.scale.set(sx, sy, sz);
+
+          const paletteIdx = pIdx % spruceTintFactors.length;
           m.traverse(c => {
             if (c.isMesh) {
               c.castShadow = true;
               c.receiveShadow = true;
+              if (c.material && c.name.includes('needles')) {
+                const cacheKey = `${c.material.uuid}_tint_${paletteIdx}`;
+                if (!spruceMatCache.has(cacheKey)) {
+                  const tintedMat = c.material.clone();
+                  tintedMat.vertexColors = true;
+                  tintedMat.color.multiply(spruceTintFactors[paletteIdx]);
+                  tintedMat.roughness = 0.66;
+                  tintedMat.side = THREE.DoubleSide;
+                  spruceMatCache.set(cacheKey, tintedMat);
+                }
+                c.material = spruceMatCache.get(cacheKey);
+              }
             }
           });
+
+          const needlesNode = m.getObjectByName('tree_spruce_needles');
+          if (needlesNode) {
+            this.animatedFoliage.push({
+              foliage: needlesNode,
+              phaseOffset: p.x * 0.35 + p.z * 0.45
+            });
+          }
           pineGroup.add(m);
         }
       }).catch(err => {
