@@ -306,6 +306,85 @@ export class World {
     this.buildVegetationLayers();
   }
 
+  /**
+   * Returns the exact terrain elevation Y at (x, z), accounting for the raised homestead terrace knoll.
+   * @param {number} x World X coordinate
+   * @param {number} z World Z coordinate
+   * @returns {number} Elevation Y (0.60m on terrace knoll, 0.0m on valley floor)
+   */
+  getGroundElevation(x, z) {
+    // Raised Homestead Knoll Terrace: |X| <= 14.3m, Z in [-45.3, -22.7] at +0.60m
+    if (Math.abs(x) <= 14.3 && z >= -45.3 && z <= -22.7) {
+      return 0.60;
+    }
+    return 0.0;
+  }
+
+  /**
+   * Authoritative spatial exclusion check ensuring NO tree, bush, or structure ever spawns inside:
+   * - Any of the 6 Arable Farming Zones (with canopyMargin buffer)
+   * - Any of the 4 Fenced Crop Paddocks (with canopyMargin buffer)
+   * - Main Avenue, South Lane, East Cross-Lane, or West Cross-Lane
+   * - Farmhouse Knoll Terrace retaining wall seam and chalet interior
+   * - Stone Well Plaza, Wheelbarrow, Farm Cart, or Picnic Area
+   * - Outside perimeter barrier walls / penetrating steep mountain slopes
+   * @param {number} x World X coordinate
+   * @param {number} z World Z coordinate
+   * @param {number} canopyMargin Clearance buffer in meters (default 2.0m)
+   * @returns {boolean} True if position is safe and valid
+   */
+  isTreePositionValid(x, z, canopyMargin = 2.0) {
+    const m = canopyMargin;
+
+    // 1. All 6 Authoritative Arable Farming Zones (from FarmingManager.canTill)
+    const arableZones = [
+      { xMin: -10, xMax: -4,  zMin: -2,  zMax: 10 }, // Zone 1: West Homestead Arable Field
+      { xMin: -22, xMax: -10, zMin: 11,  zMax: 21 }, // Zone 2: South-West Farm Field Paddock
+      { xMin: -22, xMax: -10, zMin: -19, zMax: -9 }, // Zone 3: North-West Farm Field Paddock
+      { xMin: 10,  xMax: 22,  zMin: 11,  zMax: 21 }, // Zone 4: South-East Farm Field Paddock
+      { xMin: 10,  xMax: 22,  zMin: -19, zMax: -9 }, // Zone 5: North-East Farm Field Paddock
+      { xMin: 4,   xMax: 10,  zMin: -2,  zMax: 10 }  // Zone 6: East Homestead Arable Field
+    ];
+    for (const zone of arableZones) {
+      if (
+        x >= zone.xMin - m && x <= zone.xMax + m &&
+        z >= zone.zMin - m && z <= zone.zMax + m
+      ) {
+        return false;
+      }
+    }
+
+    // 2. All 4 Enclosed Crop Paddocks (±16, ±14..16, width 14 -> X:[9,23], depth 10 -> Z:[-19,-9] & [11,21])
+    const paddocks = [
+      { x: -16, z: -14, hw: 7.0, hd: 5.0 },
+      { x: 16,  z: -14, hw: 7.0, hd: 5.0 },
+      { x: -16, z: 16,  hw: 7.0, hd: 5.0 },
+      { x: 16,  z: 16,  hw: 7.0, hd: 5.0 }
+    ];
+    for (const p of paddocks) {
+      if (Math.abs(x - p.x) <= p.hw + m && Math.abs(z - p.z) <= p.hd + m) {
+        return false;
+      }
+    }
+
+    // 3. Country Lanes & Walkways
+    if (Math.abs(x) <= 2.8 + m * 0.4 && z >= -26 && z <= 43) return false; // Main & South Avenue
+    if (Math.abs(z - (-8)) <= 2.2 + m * 0.4 && x >= -36 && x <= 39) return false; // East & West Cross-Lanes
+
+    // 4. Farmhouse Knoll Terrace & Retaining Wall Edge (Terrace bounds: |X| <= 14.3, Z in [-45.3, -22.7])
+    if (Math.abs(x) <= 15.5 && z >= -46.0 && z <= -21.5) return false;
+
+    // 5. Stone Well Plaza (-16, -8) & Picnic Table (26, -1)
+    if (Math.hypot(x - (-16), z - (-8)) < 3.2 + m * 0.4) return false;
+    if (Math.hypot(x - 26, z - (-1)) < 2.4) return false;
+
+    // 6. Keep inside perimeter barrier walls & clear of steep mountain foothill cones
+    // (North Wall inner face z=-42.5, South z=46.0, West x=-48.0, East x=48.0)
+    if (Math.abs(x) > 42.0 || z < -40.0 || z > 42.0) return false;
+
+    return true;
+  }
+
   initSkyAndLighting() {
     // Soft Mountain Basin Fog (gentle, preserves clear visibility of farm estate)
     this.scene.fog = new THREE.FogExp2(0xbcd7f5, 0.0038);
@@ -1383,21 +1462,24 @@ export class World {
 
     // 1. BLENDER STYLIZED APPLE ORCHARD & HERITAGE GROVE (12 Trees)
     // Upgraded from procedural spheres to high-fidelity Blender 3D models with branch-anchored fruit development
+    // Coordinates verified outside all 6 arable zones, 4 fenced paddocks, and country lanes
     const orchardLocations = [
-      // East Orchard Rows (along East Orchard Lane)
-      { x: 19.5, z: -17.8, h: 3.4, rot: 0.2 },
-      { x: 25.8, z: -16.5, h: 3.6, rot: 1.1 },
-      { x: 32.2, z: -17.2, h: 3.3, rot: -0.7 },
-      { x: 20.2, z: -6.2,  h: 3.5, rot: 0.8 },
-      { x: 26.5, z: -5.0,  h: 3.7, rot: -1.3 },
-      { x: 33.0, z: -6.5,  h: 3.4, rot: 0.4 },
-      { x: 19.8, z: 6.8,   h: 3.6, rot: -0.5 },
-      { x: 26.2, z: 5.5,   h: 3.5, rot: 1.4 },
-      { x: 32.5, z: 6.2,   h: 3.3, rot: -1.0 },
-      // West Meadow Heritage Fruit Trees (framing Kitchen Garden & Knoll)
-      { x: -27.5, z: -15.5, h: 3.5, rot: 0.6 },
-      { x: -28.8, z: -4.2,  h: 3.7, rot: -0.9 },
-      { x: -28.0, z: 8.5,   h: 3.4, rot: 1.2 }
+      // North-East Orchard Row (East of NE Pumpkin Paddock x=23, North of East Lane z=-8)
+      { x: 26.0, z: -16.0, h: 3.4, rot: 0.2 },
+      { x: 31.2, z: -15.2, h: 3.6, rot: 1.1 },
+      { x: 36.2, z: -16.2, h: 3.3, rot: -0.7 },
+      // Central-East Orchard Row (South of East Lane z=-8, clear of Picnic Table at 26,-1)
+      { x: 25.8, z: -4.2,  h: 3.5, rot: 0.8 },
+      { x: 31.2, z: -3.6,  h: 3.7, rot: -1.3 },
+      { x: 36.5, z: -4.4,  h: 3.4, rot: 0.4 },
+      // South-East Orchard Row (North of SE Paddock z=11, East of NE/SE Paddocks x=23)
+      { x: 25.8, z: 5.8,   h: 3.6, rot: -0.5 },
+      { x: 31.2, z: 5.2,   h: 3.5, rot: 1.4 },
+      { x: 36.4, z: 6.0,   h: 3.3, rot: -1.0 },
+      // West Meadow Heritage Fruit Trees (West of NW/SW Paddocks x=-23)
+      { x: -27.5, z: -15.0, h: 3.5, rot: 0.6 },
+      { x: -28.5, z: -3.8,  h: 3.7, rot: -0.9 },
+      { x: -27.8, z: 7.2,   h: 3.4, rot: 1.2 }
     ];
 
     const pseudoRand = (seed) => {
@@ -1407,8 +1489,12 @@ export class World {
 
     // Synchronously initialize all 12 tree groups, colliders, and interactables
     orchardLocations.forEach((loc, tIndex) => {
+      if (!this.isTreePositionValid(loc.x, loc.z)) {
+        console.warn(`⚠️ [World] Orchard Tree #${tIndex} at (${loc.x}, ${loc.z}) failed spatial validation`);
+      }
       const treeGroup = new THREE.Group();
-      treeGroup.position.set(loc.x, 0, loc.z);
+      const baseY = this.getGroundElevation(loc.x, loc.z);
+      treeGroup.position.set(loc.x, baseY, loc.z);
       
       // Controlled procedural yaw rotation
       const yawVar = (loc.rot || 0) + (pseudoRand(tIndex * 31.7 + 5.2) - 0.5) * 0.6;
@@ -1421,10 +1507,10 @@ export class World {
       const trunkRadius = 0.44 * scaleVar;
 
       // Solid collision cylinder matching scaled tree base
-      this.world.addCylinderCollider(loc.x, loc.z, trunkRadius, trunkH);
+      this.world.addCylinderCollider(loc.x, loc.z, trunkRadius, trunkH, baseY);
       const trunkBox = new THREE.Box3(
-        new THREE.Vector3(loc.x - trunkRadius, 0, loc.z - trunkRadius),
-        new THREE.Vector3(loc.x + trunkRadius, trunkH, loc.z + trunkRadius)
+        new THREE.Vector3(loc.x - trunkRadius, baseY, loc.z - trunkRadius),
+        new THREE.Vector3(loc.x + trunkRadius, baseY + trunkH, loc.z + trunkRadius)
       );
       this.world.colliders.push({ box: trunkBox, mesh: treeGroup, type: 'solid', isCylinder: true });
 
@@ -1614,26 +1700,30 @@ export class World {
 
 
     // 2. HANDCRAFTED BLENDER SLENDER BIRCH TREES
-    // Picturesque natural copses with sweeping trunks, lenticels, and weeping foliage
+    // Positioned outside all arable fields, terrace retaining walls, and stone well plaza
     const birchLocations = [
-      // Terrace hillside copses (framing chalet knoll)
-      { x: -16.5, z: -26.0, scale: 1.05 },
-      { x: 16.5,  z: -26.0, scale: 1.05 },
-      { x: -14.0, z: -35.0, scale: 0.95 },
-      { x: 14.0,  z: -35.0, scale: 0.95 },
-      // Shaded copse near stone well plaza (clear of well radius 2.6m and road)
-      { x: -22.5, z: -3.0,  scale: 1.00 },
-      { x: -24.0, z: 2.0,   scale: 0.95 },
-      // Meadow groves (framing vistas)
-      { x: -18.5, z: 27.0,  scale: 1.00 },
-      { x: 18.5,  z: 27.0,  scale: 1.00 },
-      { x: 36.0,  z: -22.0, scale: 1.05 },
-      { x: 36.0,  z: 14.0,  scale: 0.95 }
+      // Terrace flanking copses (safely outside the +/-14.3m terrace retaining wall)
+      { x: -18.0, z: -26.5, scale: 1.05 },
+      { x: 18.0,  z: -26.5, scale: 1.05 },
+      { x: -18.5, z: -34.5, scale: 0.95 },
+      { x: 18.5,  z: -34.5, scale: 0.95 },
+      // West Meadow copse (clear of Stone Well at -16,-8 and SW/NW paddocks)
+      { x: -23.5, z: -2.0,  scale: 1.00 },
+      { x: -26.0, z: 3.5,   scale: 0.95 },
+      // Southern & Eastern meadow groves (clear of paddocks z=21)
+      { x: -18.5, z: 27.5,  scale: 1.00 },
+      { x: 18.5,  z: 27.5,  scale: 1.00 },
+      { x: 35.5,  z: -23.5, scale: 1.05 },
+      { x: 35.5,  z: 15.5,  scale: 0.95 }
     ];
 
     birchLocations.forEach((bl, bIdx) => {
+      if (!this.isTreePositionValid(bl.x, bl.z)) {
+        console.warn(`⚠️ [World] Birch Tree #${bIdx} at (${bl.x}, ${bl.z}) failed spatial validation`);
+      }
       const bGroup = new THREE.Group();
-      bGroup.position.set(bl.x, 0, bl.z);
+      const baseY = this.getGroundElevation(bl.x, bl.z);
+      bGroup.position.set(bl.x, baseY, bl.z);
       const rotY = (pseudoRand(bIdx * 37.1 + 8.4) - 0.5) * Math.PI * 2;
       bGroup.rotation.y = rotY;
       this.scene.add(bGroup);
@@ -1642,10 +1732,10 @@ export class World {
       const bRadius = 0.28 * bl.scale;
 
       // Solid collision cylinder matching birch base
-      this.world.addCylinderCollider(bl.x, bl.z, bRadius, bTrunkH);
+      this.world.addCylinderCollider(bl.x, bl.z, bRadius, bTrunkH, baseY);
       const bBox = new THREE.Box3(
-        new THREE.Vector3(bl.x - bRadius, 0, bl.z - bRadius),
-        new THREE.Vector3(bl.x + bRadius, bTrunkH, bl.z + bRadius)
+        new THREE.Vector3(bl.x - bRadius, baseY, bl.z - bRadius),
+        new THREE.Vector3(bl.x + bRadius, baseY + bTrunkH, bl.z + bRadius)
       );
       this.world.colliders.push({ box: bBox, mesh: bGroup, type: 'solid', isCylinder: true });
 
@@ -1668,47 +1758,50 @@ export class World {
     });
 
     // 3. HANDCRAFTED BLENDER TIERED ALPINE SPRUCE TREES
-    // Dense, layered evergreen forest belt naturally framing valley perimeter
+    // Dense, layered evergreen forest belt naturally framing valley perimeter inside boundary walls
     const spruceLocations = [
       // North Mountain Forest Belt (Behind & flanking farmhouse knoll with safe breathing room)
-      { x: -32.0, z: -41.0, scale: 1.05 },
-      { x: -25.0, z: -41.5, scale: 1.10 },
-      { x: -18.0, z: -42.0, scale: 0.95 },
-      { x: 0.0,   z: -42.5, scale: 1.15 },
-      { x: 18.0,  z: -42.0, scale: 0.95 },
-      { x: 25.0,  z: -41.5, scale: 1.10 },
-      { x: 32.0,  z: -41.0, scale: 1.05 },
+      { x: -34.0, z: -37.5, scale: 1.05 },
+      { x: -27.5, z: -38.5, scale: 1.10 },
+      { x: -20.5, z: -38.0, scale: 0.95 },
+      { x: 20.5,  z: -38.0, scale: 0.95 },
+      { x: 27.5,  z: -38.5, scale: 1.10 },
+      { x: 34.0,  z: -37.5, scale: 1.05 },
 
       // East Foothill Forest (flanking east valley ridge)
-      { x: 44.0, z: -32.0, scale: 1.00 },
-      { x: 45.0, z: -24.0, scale: 1.10 },
-      { x: 44.0, z: -14.0, scale: 0.95 },
-      { x: 45.0, z: 0.0,   scale: 1.05 },
-      { x: 44.0, z: 12.0,  scale: 0.90 },
-      { x: 45.0, z: 24.0,  scale: 1.05 },
-      { x: 44.0, z: 35.0,  scale: 1.00 },
+      { x: 39.5, z: -30.0, scale: 1.00 },
+      { x: 40.5, z: -21.0, scale: 1.08 },
+      { x: 40.0, z: -11.5, scale: 0.95 },
+      { x: 40.5, z: 0.5,   scale: 1.05 },
+      { x: 39.5, z: 11.5,  scale: 0.92 },
+      { x: 40.5, z: 22.5,  scale: 1.05 },
+      { x: 39.0, z: 32.5,  scale: 1.00 },
 
       // South Valley Entrance Woodlands (framing south meadow approach)
-      { x: -32.0, z: 43.5, scale: 1.05 },
-      { x: -24.0, z: 44.0, scale: 1.10 },
-      { x: -15.0, z: 43.5, scale: 0.95 },
-      { x: 15.0,  z: 43.5, scale: 0.95 },
-      { x: 24.0,  z: 44.0, scale: 1.10 },
-      { x: 32.0,  z: 43.5, scale: 1.05 },
+      { x: -31.0, z: 38.5, scale: 1.05 },
+      { x: -23.0, z: 39.5, scale: 1.10 },
+      { x: -14.0, z: 38.5, scale: 0.95 },
+      { x: 14.0,  z: 38.5, scale: 0.95 },
+      { x: 23.0,  z: 39.5, scale: 1.10 },
+      { x: 31.0,  z: 38.5, scale: 1.05 },
 
       // West Ridge Forest (flanking west ridge)
-      { x: -44.0, z: -30.0, scale: 1.00 },
-      { x: -45.0, z: -20.0, scale: 1.05 },
-      { x: -44.0, z: -8.0,  scale: 0.95 },
-      { x: -45.0, z: 6.0,   scale: 1.05 },
-      { x: -44.0, z: 18.0,  scale: 0.95 },
-      { x: -45.0, z: 29.0,  scale: 1.10 },
-      { x: -44.0, z: 39.0,  scale: 1.00 }
+      { x: -39.5, z: -29.0, scale: 1.00 },
+      { x: -40.5, z: -19.5, scale: 1.05 },
+      { x: -39.5, z: -11.5, scale: 0.95 },
+      { x: -40.5, z: 1.5,   scale: 1.05 },
+      { x: -39.5, z: 14.0,  scale: 0.95 },
+      { x: -40.5, z: 25.0,  scale: 1.10 },
+      { x: -39.0, z: 34.5,  scale: 1.00 }
     ];
 
     spruceLocations.forEach((p, pIdx) => {
+      if (!this.isTreePositionValid(p.x, p.z)) {
+        console.warn(`⚠️ [World] Spruce Tree #${pIdx} at (${p.x}, ${p.z}) failed spatial validation`);
+      }
       const pineGroup = new THREE.Group();
-      pineGroup.position.set(p.x, 0, p.z);
+      const baseY = this.getGroundElevation(p.x, p.z);
+      pineGroup.position.set(p.x, baseY, p.z);
       const rotY = (pseudoRand(pIdx * 43.3 + 12.7) - 0.5) * Math.PI * 2;
       pineGroup.rotation.y = rotY;
       this.scene.add(pineGroup);
@@ -1717,10 +1810,10 @@ export class World {
       const pRadius = 0.44 * p.scale;
 
       // Solid collision cylinder matching spruce base
-      this.world.addCylinderCollider(p.x, p.z, pRadius, pTrunkH);
+      this.world.addCylinderCollider(p.x, p.z, pRadius, pTrunkH, baseY);
       const pBox = new THREE.Box3(
-        new THREE.Vector3(p.x - pRadius, 0, p.z - pRadius),
-        new THREE.Vector3(p.x + pRadius, pTrunkH, p.z + pRadius)
+        new THREE.Vector3(p.x - pRadius, baseY, p.z - pRadius),
+        new THREE.Vector3(p.x + pRadius, baseY + pTrunkH, p.z + pRadius)
       );
       this.world.colliders.push({ box: pBox, mesh: pineGroup, type: 'solid', isCylinder: true });
 
@@ -2028,8 +2121,8 @@ export class World {
 
   createStylizedBush(x, z, scale = 1.0) {
     const bGroup = new THREE.Group();
-    // Correct ground elevation: terrace knoll elevation is +0.60m for z <= -23 and |x| <= 14
-    const baseY = (z <= -23 && Math.abs(x) <= 14) ? 0.60 : 0.0;
+    // Correct ground elevation: snapped via authoritative getGroundElevation
+    const baseY = this.getGroundElevation(x, z);
     bGroup.position.set(x, baseY, z);
     bGroup.rotation.y = Math.random() * Math.PI * 2;
     this.scene.add(bGroup);

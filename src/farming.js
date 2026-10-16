@@ -147,17 +147,17 @@ export class FarmingManager {
     wetTex.wrapS = THREE.RepeatWrapping; wetTex.wrapT = THREE.RepeatWrapping;
 
     this.materials = {
-      // PBR Non-Metallic Soil Materials with organic Vertex Color modulation
+      // PBR Non-Metallic Soil Materials with organic texture & vertex color support
       drySoil: new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        color: 0xffffff,
+        map: dryTex,
+        color: 0xd6b89c,
         roughness: 0.94,
         metalness: 0.0,
         dithering: true
       }),
       wateredSoil: new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        color: 0x554438, // Softly darkened saturated humus with subtle moisture sheen
+        map: wetTex,
+        color: 0x6e5239, // Softly darkened saturated humus with subtle moisture sheen
         roughness: 0.72,
         metalness: 0.0,
         dithering: true
@@ -307,6 +307,11 @@ export class FarmingManager {
           if (c.isMesh) {
             c.castShadow = false;
             c.receiveShadow = true;
+            const hasVC = !!(c.geometry && c.geometry.attributes && c.geometry.attributes.color);
+            this.materials.drySoil.vertexColors = hasVC;
+            this.materials.wateredSoil.vertexColors = hasVC;
+            this.materials.drySoil.needsUpdate = true;
+            this.materials.wateredSoil.needsUpdate = true;
             c.material = this.materials.drySoil;
           }
         });
@@ -352,21 +357,22 @@ export class FarmingManager {
       if (this.soilTemplate && (!tile.soilMesh || !tile.soilMesh.userData?.isBlenderModel)) {
         const oldGroup = tile.soilGroup;
         const wasWatered = tile.isWatered;
-        const crop = tile.crop;
 
-        while (oldGroup.children.length > 0) {
-          oldGroup.remove(oldGroup.children[0]);
+        // Safely remove only soil mesh and furrows, keeping any cropGroup intact
+        if (tile.soilMesh) {
+          oldGroup.remove(tile.soilMesh);
+        }
+        if (tile.furrows && tile.furrows.length > 0) {
+          tile.furrows.forEach(f => oldGroup.remove(f));
         }
 
         const { soilMesh } = this.createSoilBedMesh(wasWatered);
         oldGroup.add(soilMesh);
         tile.soilMesh = soilMesh;
         tile.furrows = [];
+      }
 
-        if (crop) {
-          this.renderCropMesh(tile);
-        }
-      } else if (tile.crop && tile.crop.type === 'carrot') {
+      if (tile.crop) {
         this.renderCropMesh(tile);
       }
     });

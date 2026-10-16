@@ -13,14 +13,14 @@ export class CollisionWorld {
     this.movingPlatforms = []; // { mesh, min, max, velocity, update(dt) }
   }
 
-  addCylinderCollider(x, z, radius, height = 12) {
-    const cylinder = { x, z, radius, height };
+  addCylinderCollider(x, z, radius, height = 12, minY = 0) {
+    const cylinder = { x, z, radius, height, minY };
     this.cylinders.push(cylinder);
 
     // Register matching AABB for broadphase queries
     const box = new THREE.Box3(
-      new THREE.Vector3(x - radius, 0, z - radius),
-      new THREE.Vector3(x + radius, height, z + radius)
+      new THREE.Vector3(x - radius, minY, z - radius),
+      new THREE.Vector3(x + radius, minY + height, z + radius)
     );
     this.colliders.push({ box, type: 'solid', isCylinder: true });
     return cylinder;
@@ -254,7 +254,8 @@ export class CollisionWorld {
     // 4.5. Resolve Accurate Radial Cylinder Collisions (Tree trunks, wooden posts)
     // Guarantees true circular hitboxes and smooth tangential sliding without corner snagging
     for (const cyl of this.cylinders) {
-      if (player.position.y + footOffset >= cyl.height || player.position.y + height <= 0) {
+      const cylMinY = cyl.minY || 0;
+      if (player.position.y + footOffset >= cylMinY + cyl.height || player.position.y + height <= cylMinY) {
         continue;
       }
       const dx = player.position.x - cyl.x;

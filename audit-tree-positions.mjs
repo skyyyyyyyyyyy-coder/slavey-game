@@ -1,66 +1,69 @@
 // Spatial audit and layout generator for Meadow Valley trees
 const orchardTrees = [
-  { x: 19.5, z: -17.8 }, { x: 25.8, z: -16.5 }, { x: 32.2, z: -17.2 },
-  { x: 20.2, z: -6.2 },  { x: 26.5, z: -5.0 },  { x: 33.0, z: -6.5 },
-  { x: 19.8, z: 6.8 },   { x: 26.2, z: 5.5 },   { x: 32.5, z: 6.2 },
-  { x: -27.5, z: -15.5 }, { x: -28.8, z: -4.2 }, { x: -28.0, z: 8.5 }
+  // North-East Orchard Row (East of NE Pumpkin Paddock x=23, North of East Lane z=-8)
+  { x: 26.0, z: -16.0 }, { x: 31.2, z: -15.2 }, { x: 36.2, z: -16.2 },
+  // Central-East Orchard Row (South of East Lane z=-8, clear of Picnic Table at 26,-1)
+  { x: 25.8, z: -4.2 },  { x: 31.2, z: -3.6 },  { x: 36.5, z: -4.4 },
+  // South-East Orchard Row (North of SE Paddock z=11, East of NE/SE Paddocks x=23)
+  { x: 25.8, z: 5.8 },   { x: 31.2, z: 5.2 },   { x: 36.4, z: 6.0 },
+  // West Meadow Heritage Fruit Trees (West of NW/SW Paddocks x=-23)
+  { x: -27.5, z: -15.0 }, { x: -28.5, z: -3.8 }, { x: -27.8, z: 7.2 }
 ];
 
-// Proposed curated Spruce positions (framing perimeter mountain woodland)
+// Proposed curated Spruce positions (framing perimeter mountain woodland inside boundary walls)
 const candidateSpruce = [
   // North Mountain Forest Belt (Behind & flanking farmhouse knoll with safe breathing room)
-  { x: -32.0, z: -41.0, scale: 1.05 },
-  { x: -25.0, z: -41.5, scale: 1.10 },
-  { x: -18.0, z: -42.0, scale: 0.95 },
-  { x: 0.0,   z: -42.5, scale: 1.15 },
-  { x: 18.0,  z: -42.0, scale: 0.95 },
-  { x: 25.0,  z: -41.5, scale: 1.10 },
-  { x: 32.0,  z: -41.0, scale: 1.05 },
+  { x: -34.0, z: -37.5, scale: 1.05 },
+  { x: -27.5, z: -38.5, scale: 1.10 },
+  { x: -20.5, z: -38.0, scale: 0.95 },
+  { x: 20.5,  z: -38.0, scale: 0.95 },
+  { x: 27.5,  z: -38.5, scale: 1.10 },
+  { x: 34.0,  z: -37.5, scale: 1.05 },
 
   // East Foothill Forest (flanking east valley ridge)
-  { x: 44.0, z: -32.0, scale: 1.00 },
-  { x: 45.0, z: -24.0, scale: 1.10 },
-  { x: 44.0, z: -14.0, scale: 0.95 },
-  { x: 45.0, z: 0.0,   scale: 1.05 },
-  { x: 44.0, z: 12.0,  scale: 0.90 },
-  { x: 45.0, z: 24.0,  scale: 1.05 },
-  { x: 44.0, z: 35.0,  scale: 1.00 },
+  { x: 39.5, z: -30.0, scale: 1.00 },
+  { x: 40.5, z: -21.0, scale: 1.08 },
+  { x: 40.0, z: -11.5, scale: 0.95 },
+  { x: 40.5, z: 0.5,   scale: 1.05 },
+  { x: 39.5, z: 11.5,  scale: 0.92 },
+  { x: 40.5, z: 22.5,  scale: 1.05 },
+  { x: 39.0, z: 32.5,  scale: 1.00 },
 
   // South Valley Entrance Woodlands (framing south meadow approach)
-  { x: -32.0, z: 43.5, scale: 1.05 },
-  { x: -24.0, z: 44.0, scale: 1.10 },
-  { x: -15.0, z: 43.5, scale: 0.95 },
-  { x: 15.0,  z: 43.5, scale: 0.95 },
-  { x: 24.0,  z: 44.0, scale: 1.10 },
-  { x: 32.0,  z: 43.5, scale: 1.05 },
+  { x: -31.0, z: 38.5, scale: 1.05 },
+  { x: -23.0, z: 39.5, scale: 1.10 },
+  { x: -14.0, z: 38.5, scale: 0.95 },
+  { x: 14.0,  z: 38.5, scale: 0.95 },
+  { x: 23.0,  z: 39.5, scale: 1.10 },
+  { x: 31.0,  z: 38.5, scale: 1.05 },
 
   // West Ridge Forest (flanking west ridge)
-  { x: -44.0, z: -30.0, scale: 1.00 },
-  { x: -45.0, z: -20.0, scale: 1.05 },
-  { x: -44.0, z: -8.0,  scale: 0.95 },
-  { x: -45.0, z: 6.0,   scale: 1.05 },
-  { x: -44.0, z: 18.0,  scale: 0.95 },
-  { x: -45.0, z: 29.0,  scale: 1.10 },
-  { x: -44.0, z: 39.0,  scale: 1.00 }
+  { x: -39.5, z: -29.0, scale: 1.00 },
+  { x: -40.5, z: -19.5, scale: 1.05 },
+  { x: -39.5, z: -11.5, scale: 0.95 },
+  { x: -40.5, z: 1.5,   scale: 1.05 },
+  { x: -39.5, z: 14.0,  scale: 0.95 },
+  { x: -40.5, z: 25.0,  scale: 1.10 },
+  { x: -39.0, z: 34.5,  scale: 1.00 }
 ];
 
 // Proposed curated Birch positions (picturesque copses naturally interspersed)
 const candidateBirch = [
-  // Flanking chalet knoll (with >7m clearance from house walls and porch)
-  { x: -16.5, z: -26.0, scale: 1.05 },
-  { x: 16.5,  z: -26.0, scale: 1.05 },
-  { x: -14.0, z: -35.0, scale: 0.95 },
-  { x: 14.0,  z: -35.0, scale: 0.95 },
+  // Flanking chalet knoll (with safe clearance from terrace retaining wall)
+  { x: -18.0, z: -26.5, scale: 1.05 },
+  { x: 18.0,  z: -26.5, scale: 1.05 },
+  { x: -18.5, z: -34.5, scale: 0.95 },
+  { x: 18.5,  z: -34.5, scale: 0.95 },
 
   // Shaded copse near stone well plaza (clear of well radius 2.6m and road)
-  { x: -22.5, z: -3.0,  scale: 1.00 },
-  { x: -24.0, z: 2.0,   scale: 0.95 },
+  { x: -23.5, z: -2.0,  scale: 1.00 },
+  { x: -26.0, z: 3.5,   scale: 0.95 },
 
   // Meadow groves (framing vistas)
-  { x: -18.5, z: 27.0,  scale: 1.00 },
-  { x: 18.5,  z: 27.0,  scale: 1.00 },
-  { x: 36.0,  z: -22.0, scale: 1.05 },
-  { x: 36.0,  z: 14.0,  scale: 0.95 }
+  { x: -18.5, z: 27.5,  scale: 1.00 },
+  { x: 18.5,  z: 27.5,  scale: 1.00 },
+  { x: 35.5,  z: -23.5, scale: 1.05 },
+  { x: 35.5,  z: 15.5,  scale: 0.95 }
 ];
 
 // Clearance rules
