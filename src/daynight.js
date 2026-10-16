@@ -398,19 +398,20 @@ export class DayNightCycle {
   }
 
   initLightingAndSky() {
-    // 1. Directional Sun Light with tuned shadow frustum
+    // 1. Directional Sun Light with tuned shadow frustum and normal bias to eliminate shadow acne
     this.sunLight = new THREE.DirectionalLight(0xfff8e7, 1.48);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
     this.sunLight.shadow.camera.near = 5;
-    this.sunLight.shadow.camera.far = 400;
-    const d = 75;
+    this.sunLight.shadow.camera.far = 460;
+    const d = 92;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
-    this.sunLight.shadow.bias = -0.0004;
+    this.sunLight.shadow.bias = -0.0003;
+    this.sunLight.shadow.normalBias = 0.02;
 
     this.sunLight.target = new THREE.Object3D();
     this.sunLight.target.position.set(0, 0, -10);
@@ -423,12 +424,13 @@ export class DayNightCycle {
     this.moonLight.shadow.mapSize.width = 1024;
     this.moonLight.shadow.mapSize.height = 1024;
     this.moonLight.shadow.camera.near = 5;
-    this.moonLight.shadow.camera.far = 400;
+    this.moonLight.shadow.camera.far = 460;
     this.moonLight.shadow.camera.left = -d;
     this.moonLight.shadow.camera.right = d;
     this.moonLight.shadow.camera.top = d;
     this.moonLight.shadow.camera.bottom = -d;
-    this.moonLight.shadow.bias = -0.0004;
+    this.moonLight.shadow.bias = -0.0003;
+    this.moonLight.shadow.normalBias = 0.02;
 
     this.moonLight.target = new THREE.Object3D();
     this.moonLight.target.position.set(0, 0, -10);
@@ -456,10 +458,10 @@ export class DayNightCycle {
     );
     this.scene.add(this.moonMesh);
 
-    // 6. Dynamic Sky Canvas with True Spherical Horizon Mapping
+    // 6. Dynamic Sky Canvas with True Spherical Horizon Mapping (4x1024)
     this.skyCanvas = document.createElement('canvas');
-    this.skyCanvas.width = 2;
-    this.skyCanvas.height = 512;
+    this.skyCanvas.width = 4;
+    this.skyCanvas.height = 1024;
     this.skyCtx = this.skyCanvas.getContext('2d');
     this.skyTexture = new THREE.CanvasTexture(this.skyCanvas);
 
@@ -472,6 +474,7 @@ export class DayNightCycle {
     });
     this.skyDome = new THREE.Mesh(skyGeo, skyMat);
     this.scene.add(this.skyDome);
+
 
     // 7. Star Field (Upper hemisphere distribution)
     const starCount = 750;
@@ -661,30 +664,31 @@ export class DayNightCycle {
    * Repaint sky canvas gradient with accurate spherical horizon mapping.
    * SphereGeometry UV mapping:
    * v = 1.0 (line 0 in canvas) = Top pole (Zenith)
-   * v = 0.5 (line 256 in canvas) = Equator (True Horizon)
-   * v = 0.0 (line 512 in canvas) = Bottom pole (Nadir)
+   * v = 0.5 (line 512 in canvas) = Equator (True Horizon)
+   * v = 0.0 (line 1024 in canvas) = Bottom pole (Nadir)
    * @param {Object} state 
    */
   updateSkyGradient(state) {
     if (!this.skyCtx) return;
 
     const ctx = this.skyCtx;
-    const grad = ctx.createLinearGradient(0, 0, 0, 512);
+    const grad = ctx.createLinearGradient(0, 0, 0, 1024);
 
     // Mapped precisely so the visible sky receives a smooth layered gradient
     grad.addColorStop(0.00, state.skyZenith.getStyle());
-    grad.addColorStop(0.20, state.skyMid.getStyle());
-    grad.addColorStop(0.35, state.skyLow.getStyle());
+    grad.addColorStop(0.22, state.skyMid.getStyle());
+    grad.addColorStop(0.38, state.skyLow.getStyle());
     grad.addColorStop(0.48, state.skyHorizon.getStyle());
     grad.addColorStop(0.51, state.skyHorizon.getStyle());
-    grad.addColorStop(0.55, state.fogColor.getStyle());
+    grad.addColorStop(0.56, state.fogColor.getStyle());
     grad.addColorStop(1.00, state.fogColor.getStyle());
 
     ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 2, 512);
+    ctx.fillRect(0, 0, 4, 1024);
 
     if (this.skyTexture) {
       this.skyTexture.needsUpdate = true;
     }
   }
 }
+

@@ -5,41 +5,51 @@ import { events } from './events.js';
 import { assetPipeline } from './assetPipeline.js';
 
 /**
- * Procedural lush alpine grass texture with natural dapples and meadow blossoms
+ * Procedural lush alpine grass texture with natural dapples and meadow blossoms (1024x1024)
  */
 function createGrassTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = 1024;
+  canvas.height = 1024;
   const ctx = canvas.getContext('2d');
 
   // Rich warm spring emerald base
-  ctx.fillStyle = '#4da738';
-  ctx.fillRect(0, 0, 512, 512);
+  ctx.fillStyle = '#489e35';
+  ctx.fillRect(0, 0, 1024, 1024);
 
-  // Soft natural tonal variations (warm meadow greens)
-  const tones = ['#429b30', '#56b840', '#60c448', '#3b8c2a', '#50ad36', '#48a232'];
-  for (let i = 0; i < 4500; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const r = 4 + Math.random() * 10;
+  // Soft natural tonal variations (warm meadow greens, pasture clover tones)
+  const tones = ['#3e8f2d', '#52b03a', '#5cbd44', '#368225', '#4aa533', '#429b30', '#5ba83c', '#469c36'];
+  for (let i = 0; i < 9000; i++) {
+    const x = Math.random() * 1024;
+    const y = Math.random() * 1024;
+    const r = 5 + Math.random() * 14;
     ctx.fillStyle = tones[Math.floor(Math.random() * tones.length)];
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Soft subtle blade texture in harmonized natural greens
-  for (let i = 0; i < 3500; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const len = 3 + Math.random() * 5;
-    ctx.strokeStyle = Math.random() > 0.5 ? '#4da23c' : '#39842c';
-    ctx.lineWidth = 1.0;
+  // Soft subtle blade texture in harmonized natural pasture greens
+  for (let i = 0; i < 7000; i++) {
+    const x = Math.random() * 1024;
+    const y = Math.random() * 1024;
+    const len = 4 + Math.random() * 8;
+    ctx.strokeStyle = Math.random() > 0.5 ? '#459837' : '#387e2b';
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 2, y - len);
+    ctx.lineTo(x + (Math.random() - 0.5) * 3, y - len);
     ctx.stroke();
+  }
+
+  // Subtle tiny wildflower micro-specks (clover blossoms, buttercup pollen spots)
+  for (let i = 0; i < 600; i++) {
+    const x = Math.random() * 1024;
+    const y = Math.random() * 1024;
+    ctx.fillStyle = Math.random() > 0.4 ? '#fef08a' : '#f0fdf4';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -47,6 +57,7 @@ function createGrassTexture() {
   texture.wrapT = THREE.RepeatWrapping;
   return texture;
 }
+
 
 /**
  * Rich dark organic loam soil texture with clear furrow ridges
@@ -259,6 +270,7 @@ export class World {
     this.animatedFoliage = [];
     this.clouds = [];
     this.smokeParticles = [];
+    this.grassWindUniforms = { uTime: { value: 0 } };
 
     // Stylized materials with smooth organic shading and cohesive art direction
     this.materials = {
@@ -393,30 +405,61 @@ export class World {
     this.createClouds();
   }
 
+  /**
+   * Generates a sculpted cumulus puff geometry with vertex-baked internal scattering.
+   * Crown vertices are sunlit bright, while underside vertices carry soft lavender-slate atmospheric tint.
+   */
+  createCloudPuffGeo(radius) {
+    let geo = new THREE.IcosahedronGeometry(radius, 2);
+    if (geo.index) geo = geo.toNonIndexed();
+    geo.computeVertexNormals();
+
+    const pos = geo.getAttribute('position');
+    const count = pos.count;
+    const colors = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      let x = pos.getX(i);
+      let y = pos.getY(i);
+      let z = pos.getZ(i);
+
+      if (y < 0) {
+        y *= 0.72; // flattened billow underside
+      } else {
+        y *= 1.15; // taller billowy crown
+      }
+      pos.setXYZ(i, x, y, z);
+
+      // Vertical scattering gradient: top is 1.0, bottom is soft lavender-slate (0.80, 0.83, 0.92)
+      const normY = (y / (radius * 1.15) + 1.0) * 0.5;
+      const clampedY = Math.max(0, Math.min(1, normY));
+      const r = THREE.MathUtils.lerp(0.80, 1.0, clampedY);
+      const g = THREE.MathUtils.lerp(0.83, 1.0, clampedY);
+      const b = THREE.MathUtils.lerp(0.92, 1.0, clampedY);
+      colors[i * 3] = r;
+      colors[i * 3 + 1] = g;
+      colors[i * 3 + 2] = b;
+    }
+    pos.needsUpdate = true;
+    geo.computeVertexNormals();
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }
+
   createClouds() {
-    // Upgraded Stylized-Realistic Volumetric Cloud Formations
-    // Matches Reference Board 2:
-    // - Cumulus clusters with broad puffy bases and tiered billows
-    // - Layered formations with varied altitude decks (55m - 95m)
-    // - Vertical build-ups and wispy distant horizon banks
-    // - Natural asymmetry and drift dynamics
-    const cloudWhiteMat = new THREE.MeshLambertMaterial({
+    // Upgraded Soft Volumetric-Style Multi-Deck Cloud Formations
+    // Sculpted icosahedron puffs with vertex-baked vertical scattering gradients
+    const cloudMat = new THREE.MeshLambertMaterial({
       color: 0xffffff,
+      vertexColors: true,
       flatShading: true,
       transparent: true,
       opacity: 0.94,
       fog: true
     });
-    const cloudShadeMat = new THREE.MeshLambertMaterial({
-      color: 0xe2e8f0, // Soft atmospheric slate-blue ambient underside
-      flatShading: true,
-      transparent: true,
-      opacity: 0.92,
-      fog: true
-    });
-    this.cloudMaterial = cloudWhiteMat;
+    this.cloudMaterial = cloudMat;
 
-    // 16 Curated Volumetric Cloud Formations with varied architectural structure
+    // 16 Curated Volumetric Cloud Formations with varied altitude decks (55m - 95m)
     const cloudDeckConfigs = [
       // Large towering cumulus vertical build-ups
       { x: -90, z: -110, y: 72, scale: 1.45, puffs: 9, speed: 0.28, type: 'tower' },
@@ -448,29 +491,24 @@ export class World {
 
       for (let p = 0; p < cfg.puffs; p++) {
         const pt = p / cfg.puffs;
-        // Base puffs are larger and slightly shaded underneath; upper puffs are bright and billowy
-        const isBase = p < 3;
-        const puffMat = isBase ? cloudShadeMat : cloudWhiteMat;
-
         let r = (9 + Math.sin(p * 2.1) * 3.5) * cfg.scale;
         let ox = (p - cfg.puffs / 2) * (14 * cfg.scale) + Math.sin(p * 3.4) * 5;
         let oz = Math.cos(p * 2.8) * (12 * cfg.scale);
         let oy = 0;
 
         if (cfg.type === 'tower') {
-          // Towering build-up: central billows rise significantly higher
           const towerFactor = Math.sin(pt * Math.PI);
           oy = towerFactor * (16 * cfg.scale);
           r *= (0.8 + 0.4 * towerFactor);
         } else if (cfg.type === 'bank') {
           oy = (Math.sin(p * 1.5) - 0.2) * 4;
         } else {
-          // Wispy: flatter, elongated
           r *= 0.75;
           oy = (Math.sin(p * 2.0)) * 2;
         }
 
-        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 1), puffMat);
+        const puffGeo = this.createCloudPuffGeo(r);
+        const puff = new THREE.Mesh(puffGeo, cloudMat);
         puff.position.set(ox, oy, oz);
         puff.rotation.set(p * 0.4, p * 0.7, p * 0.3);
         cloudGroup.add(puff);
@@ -481,7 +519,9 @@ export class World {
 
       this.clouds.push({
         group: cloudGroup,
-        speed: cfg.speed
+        speed: cfg.speed,
+        baseY: cfg.y,
+        phase: cIdx * 0.75
       });
     });
   }
@@ -614,135 +654,345 @@ export class World {
   }
 
   /**
+   * Geological Ridgeline Massif Generator
+   * Replaces primitive cones with high-detail sculpted peaks featuring multi-octave arêtes,
+   * stepped cliff strata terraces, couloirs, and vertex-baked alpine PBR colors.
+   */
+  buildGeologicalMassifGeo(params) {
+    const {
+      radius = 50,
+      height = 40,
+      radialSegments = 24,
+      heightSegments = 16,
+      ridges = 5,
+      ridgeDepth = 0.32,
+      twist = 0.35,
+      hasSnow = true,
+      snowLevel = 0.60,
+      snowGullyExtension = 0.22,
+      baseGreenLevel = 0.20,
+      rockColorHigh = 0x64748b,
+      rockColorMid = 0x475569,
+      rockColorLow = 0x334155,
+      snowColor = 0xf8fafc,
+      skirtColor = 0x1e3a29,
+      scaleX = 1.0,
+      scaleZ = 1.0
+    } = params;
+
+    const positions = [];
+    const indices = [];
+
+    for (let j = 0; j <= heightSegments; j++) {
+      const v = j / heightSegments;
+      const y = v * height;
+      const vCurve = Math.pow(v, 0.88);
+      const baseR = radius * (1.0 - vCurve);
+
+      for (let i = 0; i < radialSegments; i++) {
+        const u = i / radialSegments;
+        const theta = u * Math.PI * 2;
+        const twistedTheta = theta + twist * (1.0 - v) * Math.PI;
+
+        const r1 = Math.cos(ridges * twistedTheta);
+        const r2 = 0.4 * Math.cos(2 * ridges * twistedTheta + 0.5);
+        const r3 = 0.2 * Math.sin(3 * twistedTheta);
+        const ridgeFactor = 1.0 + ridgeDepth * (r1 + r2 + r3) / 1.6;
+
+        const r = j === heightSegments ? 0 : Math.max(0.1, baseR * ridgeFactor);
+        const x = Math.cos(theta) * r * scaleX;
+        const z = Math.sin(theta) * r * scaleZ;
+
+        positions.push(x, y, z);
+      }
+    }
+
+    for (let j = 0; j < heightSegments; j++) {
+      for (let i = 0; i < radialSegments; i++) {
+        const nextI = (i + 1) % radialSegments;
+        const i0 = j * radialSegments + i;
+        const i1 = j * radialSegments + nextI;
+        const i2 = (j + 1) * radialSegments + i;
+        const i3 = (j + 1) * radialSegments + nextI;
+
+        if (j < heightSegments - 1) {
+          indices.push(i0, i2, i1);
+          indices.push(i1, i2, i3);
+        } else {
+          indices.push(i0, i2, i1);
+        }
+      }
+    }
+
+    let geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo = geo.toNonIndexed();
+    geo.computeVertexNormals();
+
+    const posAttr = geo.getAttribute('position');
+    const count = posAttr.count;
+    const colors = new Float32Array(count * 3);
+
+    const cSnow = new THREE.Color(snowColor);
+    const cRockHigh = new THREE.Color(rockColorHigh);
+    const cRockMid = new THREE.Color(rockColorMid);
+    const cRockLow = new THREE.Color(rockColorLow);
+    const cSkirt = new THREE.Color(skirtColor);
+    const tempC = new THREE.Color();
+
+    for (let k = 0; k < count; k++) {
+      const x = posAttr.getX(k);
+      const y = posAttr.getY(k);
+      const z = posAttr.getZ(k);
+      const v = y / height;
+      const horizDist = Math.hypot(x / scaleX, z / scaleZ);
+
+      const expR = radius * (1.0 - Math.pow(v, 0.88));
+      const isCouloir = expR > 0.01 ? (horizDist / expR < 0.95) : false;
+      const effectiveSnowLevel = hasSnow ? (snowLevel - (isCouloir ? snowGullyExtension : 0.0) - (z < 0 ? 0.04 : 0.0)) : 2.0;
+
+      if (hasSnow && v >= effectiveSnowLevel) {
+        const snowT = Math.min(1.0, (v - effectiveSnowLevel) / 0.16);
+        tempC.copy(cRockHigh).lerp(cSnow, snowT);
+      } else if (v <= baseGreenLevel) {
+        const skirtT = v / baseGreenLevel;
+        tempC.copy(cSkirt).lerp(cRockLow, skirtT);
+      } else {
+        const midT = (v - baseGreenLevel) / (effectiveSnowLevel - baseGreenLevel);
+        if (midT > 0.5) {
+          tempC.copy(cRockMid).lerp(cRockHigh, (midT - 0.5) * 2.0);
+        } else {
+          tempC.copy(cRockLow).lerp(cRockMid, midT * 2.0);
+        }
+        if (isCouloir) {
+          tempC.multiplyScalar(0.86);
+        }
+      }
+
+      colors[k * 3] = tempC.r;
+      colors[k * 3 + 1] = tempC.g;
+      colors[k * 3 + 2] = tempC.b;
+    }
+
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }
+
+  /**
+   * Sculpted Rolling Moraine Foothill Generator
+   * Produces asymmetric glacial moraine mounds with smooth vertex-colored meadow-to-scree transitions.
+   */
+  buildMoraineFoothillGeo(radius, height, radialSegments = 16, heightSegments = 8, isNorth = false) {
+    const positions = [];
+    const indices = [];
+
+    for (let j = 0; j <= heightSegments; j++) {
+      const v = j / heightSegments;
+      const y = v * height;
+      const vProfile = Math.pow(v, 1.25);
+      const baseR = radius * (1.0 - vProfile);
+
+      for (let i = 0; i < radialSegments; i++) {
+        const u = i / radialSegments;
+        const theta = u * Math.PI * 2;
+        const m1 = 0.12 * Math.cos(3 * theta);
+        const m2 = 0.08 * Math.sin(5 * theta + 0.4);
+        const moraineFactor = 1.0 + m1 + m2;
+        const r = j === heightSegments ? 0 : Math.max(0.1, baseR * moraineFactor);
+
+        const sx = 1.15;
+        const sz = isNorth ? 0.78 : 0.88;
+        positions.push(Math.cos(theta) * r * sx, y, Math.sin(theta) * r * sz);
+      }
+    }
+
+    for (let j = 0; j < heightSegments; j++) {
+      for (let i = 0; i < radialSegments; i++) {
+        const nextI = (i + 1) % radialSegments;
+        const i0 = j * radialSegments + i;
+        const i1 = j * radialSegments + nextI;
+        const i2 = (j + 1) * radialSegments + i;
+        const i3 = (j + 1) * radialSegments + nextI;
+        if (j < heightSegments - 1) {
+          indices.push(i0, i2, i1);
+          indices.push(i1, i2, i3);
+        } else {
+          indices.push(i0, i2, i1);
+        }
+      }
+    }
+
+    let geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setIndex(indices);
+    geo = geo.toNonIndexed();
+    geo.computeVertexNormals();
+
+    const posAttr = geo.getAttribute('position');
+    const count = posAttr.count;
+    const colors = new Float32Array(count * 3);
+
+    const cBase = new THREE.Color(0x264e36);
+    const cMid = new THREE.Color(0x3d7a4f);
+    const cScree = new THREE.Color(0x5a6b7d);
+    const tempC = new THREE.Color();
+
+    for (let k = 0; k < count; k++) {
+      const v = posAttr.getY(k) / height;
+      if (v < 0.35) {
+        tempC.copy(cBase).lerp(cMid, v / 0.35);
+      } else {
+        tempC.copy(cMid).lerp(cScree, (v - 0.35) / 0.65);
+      }
+      colors[k * 3] = tempC.r;
+      colors[k * 3 + 1] = tempC.g;
+      colors[k * 3 + 2] = tempC.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    return geo;
+  }
+
+  /**
    * Sweeping Layered Alpine Mountain Massifs & Ridge Horizons
-   * Built as broad, sweeping low-poly mountain ridges pushed back to realistic horizon distances (120m - 145m),
-   * with natural saddles, shoulders, crisp faceted snowcaps, and green foothill skirts.
-   * Completely eliminates steep pillar towers and pointy spikes!
+   * Built with geological sculpted massifs across 3 depth tiers, vertex-colored moraine foothills,
+   * and impenetrable perimeter boundary colliders.
    */
   buildLayeredMountainHorizon() {
-    const rockFar = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.95, flatShading: true });
-    const rockMid = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9, flatShading: true });
-    const snowMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.65, flatShading: true });
-    const skirtMat = new THREE.MeshStandardMaterial({ color: 0x1e3a29, roughness: 0.9, flatShading: true });
-    const foothillMat = new THREE.MeshStandardMaterial({ color: 0x2d5a3f, roughness: 0.9, flatShading: true });
+    const mountainMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.92,
+      metalness: 0.05,
+      flatShading: true
+    });
 
-    // Creates an authentic sweeping low-poly mountain ridge massif
-    const createSweepingMountain = (x, z, radius, height, yaw, stretchX, stretchZ, mat, hasSnow = true) => {
+    const foothillMoraineMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.88,
+      flatShading: true
+    });
+
+    const createSweepingMassif = (cfg, isDistant = true) => {
       const group = new THREE.Group();
-      group.position.set(x, 0, z);
+      group.position.set(cfg.x, 0, cfg.z);
 
-      // Main broad faceted peak (6-7 sides for iconic low-poly alpine crags)
-      const mainGeo = new THREE.ConeGeometry(radius, height, 7);
-      mainGeo.scale(stretchX, 1.0, stretchZ);
-      const mainMesh = new THREE.Mesh(mainGeo, mat);
-      mainMesh.position.set(0, height / 2, 0);
-      mainMesh.rotation.y = yaw;
+      const mainGeo = this.buildGeologicalMassifGeo({
+        radius: cfg.r,
+        height: cfg.h,
+        radialSegments: 24,
+        heightSegments: 16,
+        ridges: cfg.ridges || 5,
+        ridgeDepth: cfg.ridgeDepth || 0.32,
+        twist: cfg.twist || 0.35,
+        hasSnow: cfg.hasSnow !== undefined ? cfg.hasSnow : true,
+        snowLevel: cfg.snowLevel || 0.60,
+        snowGullyExtension: 0.22,
+        baseGreenLevel: 0.20,
+        rockColorHigh: cfg.rockHigh || 0x64748b,
+        rockColorMid: cfg.rockMid || 0x475569,
+        rockColorLow: cfg.rockLow || 0x334155,
+        snowColor: 0xf8fafc,
+        skirtColor: 0x1e3a29,
+        scaleX: cfg.sx || 1.0,
+        scaleZ: cfg.sz || 1.0
+      });
+
+      const mainMesh = new THREE.Mesh(mainGeo, mountainMat);
+      mainMesh.rotation.y = cfg.yaw || 0;
+      mainMesh.castShadow = !isDistant;
       mainMesh.receiveShadow = true;
       group.add(mainMesh);
 
-      // Overlapping secondary shoulder ridge
-      const shoulderR = radius * 0.65;
-      const shoulderH = height * 0.72;
-      const shoulderGeo = new THREE.ConeGeometry(shoulderR, shoulderH, 6);
-      shoulderGeo.scale(stretchX * 0.9, 1.0, stretchZ * 1.1);
-      const shoulderMesh = new THREE.Mesh(shoulderGeo, mat);
-      shoulderMesh.position.set(radius * 0.45 * Math.cos(yaw), shoulderH / 2, radius * 0.45 * Math.sin(yaw));
-      shoulderMesh.rotation.y = yaw + 0.4;
-      group.add(shoulderMesh);
+      if (cfg.hasShoulder !== false) {
+        const sH = cfg.h * 0.72;
+        const sR = cfg.r * 0.65;
+        const shoulderGeo = this.buildGeologicalMassifGeo({
+          radius: sR,
+          height: sH,
+          radialSegments: 20,
+          heightSegments: 12,
+          ridges: (cfg.ridges || 5) === 5 ? 4 : 5,
+          ridgeDepth: 0.28,
+          twist: -(cfg.twist || 0.35) * 0.8,
+          hasSnow: cfg.hasSnow !== undefined ? cfg.hasSnow : (sH >= 24),
+          snowLevel: (cfg.snowLevel || 0.60) + 0.05,
+          snowGullyExtension: 0.18,
+          baseGreenLevel: 0.24,
+          rockColorHigh: cfg.rockHigh || 0x64748b,
+          rockColorMid: cfg.rockMid || 0x475569,
+          rockColorLow: cfg.rockLow || 0x334155,
+          snowColor: 0xf1f5f9,
+          skirtColor: 0x1e3a29,
+          scaleX: (cfg.sx || 1.0) * 0.9,
+          scaleZ: (cfg.sz || 1.0) * 1.1
+        });
 
-      // Lower pine-skirted ridge base
-      const skirtGeo = new THREE.ConeGeometry(radius * 0.55, height * 0.35, 6);
-      const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
-      skirtMesh.position.set(-radius * 0.35 * Math.cos(yaw), height * 0.175, -radius * 0.35 * Math.sin(yaw));
-      group.add(skirtMesh);
-
-      // Crisp faceted snowcap on summit
-      if (hasSnow && height >= 24) {
-        const snowH = height * 0.34;
-        const snowR = radius * 0.36;
-        const snowGeo = new THREE.ConeGeometry(snowR, snowH, 7);
-        snowGeo.scale(stretchX, 1.0, stretchZ);
-        const snowMesh = new THREE.Mesh(snowGeo, snowMat);
-        snowMesh.position.set(0, height - snowH / 2 + 0.1, 0);
-        snowMesh.rotation.y = yaw;
-        group.add(snowMesh);
-
-        // Secondary shoulder snowcap
-        const sSnowH = shoulderH * 0.28;
-        const sSnowR = shoulderR * 0.32;
-        const sSnowGeo = new THREE.ConeGeometry(sSnowR, sSnowH, 6);
-        const sSnowMesh = new THREE.Mesh(sSnowGeo, snowMat);
-        sSnowMesh.position.set(shoulderMesh.position.x, shoulderH - sSnowH / 2 + 0.1, shoulderMesh.position.z);
-        sSnowMesh.rotation.y = yaw + 0.4;
-        group.add(sSnowMesh);
+        const shoulderMesh = new THREE.Mesh(shoulderGeo, mountainMat);
+        const sOffset = cfg.r * 0.45;
+        shoulderMesh.position.set(
+          sOffset * Math.cos(cfg.yaw || 0),
+          0,
+          sOffset * Math.sin(cfg.yaw || 0)
+        );
+        shoulderMesh.rotation.y = (cfg.yaw || 0) + 0.4;
+        shoulderMesh.castShadow = !isDistant;
+        shoulderMesh.receiveShadow = true;
+        group.add(shoulderMesh);
       }
 
       this.scene.add(group);
     };
 
-    // 1. DISTANT ALPINE RANGES (pushed back to 115m - 165m, framing the sky gracefully)
-    // Refined color palette with atmospheric depth and high tonal separation
-    const rockFarHigh = new THREE.MeshStandardMaterial({ color: 0x718096, roughness: 0.92, flatShading: true }); // Distant atmospheric slate
-    const rockFarDeep = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.95, flatShading: true }); // Dramatic shadowed cliffs
-    const rockNear    = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.88, flatShading: true }); // Rich near-range bedrock
-    const ridgeAccent = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.90, flatShading: true }); // Sharp ridge precipices
-
-    // North Range (magnificent panoramic alpine backdrop safely behind Farmhouse estate)
+    // 1. DISTANT ALPINE RANGES (pushed back to 125m - 165m, framing the valley sky)
+    // Distant massifs do not cast shadow onto the 2048x2048 map, avoiding acne and keeping sharpness on the valley
     const northMassifs = [
-      { x: -95, z: -148, r: 60, h: 42, yaw: 0.35, sx: 1.45, sz: 0.85, mat: rockFarHigh },
-      { x: -50, z: -158, r: 66, h: 48, yaw: 0.75, sx: 1.35, sz: 0.85, mat: rockFarDeep },
-      { x: -5,  z: -164, r: 72, h: 52, yaw: 0.18, sx: 1.55, sz: 0.80, mat: rockFarHigh },
-      { x: 44,  z: -155, r: 64, h: 46, yaw: 1.15, sx: 1.35, sz: 0.85, mat: rockFarDeep },
-      { x: 92,  z: -148, r: 58, h: 40, yaw: 0.52, sx: 1.40, sz: 0.85, mat: rockFarHigh }
+      { x: -95, z: -148, r: 60, h: 42, yaw: 0.35, sx: 1.45, sz: 0.85, ridges: 5, twist: 0.35, snowLevel: 0.58 },
+      { x: -50, z: -158, r: 66, h: 48, yaw: 0.75, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.30, snowLevel: 0.54 },
+      { x: -5,  z: -164, r: 72, h: 52, yaw: 0.18, sx: 1.55, sz: 0.80, ridges: 5, twist: 0.40, snowLevel: 0.52 },
+      { x: 44,  z: -155, r: 64, h: 46, yaw: 1.15, sx: 1.35, sz: 0.85, ridges: 6, twist: -0.35, snowLevel: 0.56 },
+      { x: 92,  z: -148, r: 58, h: 40, yaw: 0.52, sx: 1.40, sz: 0.85, ridges: 5, twist: 0.32, snowLevel: 0.60 }
     ];
-    northMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
+    northMassifs.forEach(m => createSweepingMassif(m, true));
 
-    // South Range
     const southMassifs = [
-      { x: -92, z: 128, r: 58, h: 38, yaw: 0.42, sx: 1.42, sz: 0.92, mat: rockFarDeep },
-      { x: -46, z: 138, r: 64, h: 44, yaw: 0.88, sx: 1.32, sz: 0.95, mat: rockFarHigh },
-      { x: 6,   z: 144, r: 68, h: 48, yaw: 0.28, sx: 1.52, sz: 0.92, mat: rockFarDeep },
-      { x: 52,  z: 136, r: 62, h: 42, yaw: 1.18, sx: 1.32, sz: 0.95, mat: rockFarHigh },
-      { x: 94,  z: 126, r: 56, h: 36, yaw: 0.62, sx: 1.42, sz: 0.92, mat: rockFarDeep }
+      { x: -92, z: 128, r: 58, h: 38, yaw: 0.42, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.32, snowLevel: 0.60 },
+      { x: -46, z: 138, r: 64, h: 44, yaw: 0.88, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.38, snowLevel: 0.55 },
+      { x: 6,   z: 144, r: 68, h: 48, yaw: 0.28, sx: 1.52, sz: 0.92, ridges: 5, twist: 0.36, snowLevel: 0.52 },
+      { x: 52,  z: 136, r: 62, h: 42, yaw: 1.18, sx: 1.32, sz: 0.95, ridges: 6, twist: -0.32, snowLevel: 0.58 },
+      { x: 94,  z: 126, r: 56, h: 36, yaw: 0.62, sx: 1.42, sz: 0.92, ridges: 5, twist: 0.30, snowLevel: 0.62 }
     ];
-    southMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
+    southMassifs.forEach(m => createSweepingMassif(m, true));
 
-    // West Range
     const westMassifs = [
-      { x: -130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, mat: rockFarHigh },
-      { x: -140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, mat: rockFarDeep },
-      { x: -140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, mat: rockFarHigh },
-      { x: -128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, mat: rockFarDeep }
+      { x: -130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.60 },
+      { x: -140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.55 },
+      { x: -140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.58 },
+      { x: -128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.62 }
     ];
-    westMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
+    westMassifs.forEach(m => createSweepingMassif(m, true));
 
-    // East Range
     const eastMassifs = [
-      { x: 130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, mat: rockFarHigh },
-      { x: 140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, mat: rockFarDeep },
-      { x: 140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, mat: rockFarHigh },
-      { x: 128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, mat: rockFarDeep }
+      { x: 130, z: -72, r: 56, h: 40, yaw: 1.52, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.35, snowLevel: 0.60 },
+      { x: 140, z: -22, r: 64, h: 45, yaw: 1.68, sx: 0.92, sz: 1.32, ridges: 6, twist: -0.35, snowLevel: 0.55 },
+      { x: 140, z: 28,  r: 62, h: 43, yaw: 1.42, sx: 0.92, sz: 1.42, ridges: 5, twist: 0.38, snowLevel: 0.58 },
+      { x: 128, z: 76,  r: 56, h: 38, yaw: 1.58, sx: 0.92, sz: 1.32, ridges: 5, twist: -0.30, snowLevel: 0.62 }
     ];
-    eastMassifs.forEach(m => createSweepingMountain(m.x, m.z, m.r, m.h, m.yaw, m.sx, m.sz, m.mat, true));
+    eastMassifs.forEach(m => createSweepingMassif(m, true));
 
-    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (stronger light/shadow planes & cliff ridges)
+    // 2. MIDGROUND MOUNTAIN RIDGES & CRAGS (closer depth tier with prominent facets casting crisp ground shadows)
     const midCrags = [
-      { x: -64, z: -110, r: 40, h: 32, yaw: 0.42, sx: 1.25, sz: 0.82, mat: rockNear },
-      { x: -24, z: -116, r: 42, h: 34, yaw: 0.82, sx: 1.25, sz: 0.82, mat: ridgeAccent },
-      { x: 26,  z: -114, r: 42, h: 33, yaw: 0.22, sx: 1.25, sz: 0.82, mat: rockNear },
-      { x: 66,  z: -108, r: 40, h: 31, yaw: 1.02, sx: 1.25, sz: 0.82, mat: ridgeAccent },
-      { x: -90, z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, mat: rockNear },
-      { x: -90, z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, mat: ridgeAccent },
-      { x: 90,  z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, mat: rockNear },
-      { x: 90,  z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, mat: ridgeAccent }
+      { x: -64, z: -110, r: 40, h: 32, yaw: 0.42, sx: 1.25, sz: 0.82, ridges: 4, twist: 0.30, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: -24, z: -116, r: 42, h: 34, yaw: 0.82, sx: 1.25, sz: 0.82, ridges: 5, twist: -0.28, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
+      { x: 26,  z: -114, r: 42, h: 33, yaw: 0.22, sx: 1.25, sz: 0.82, ridges: 5, twist: 0.28, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: 66,  z: -108, r: 40, h: 31, yaw: 1.02, sx: 1.25, sz: 0.82, ridges: 4, twist: -0.30, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
+      { x: -90, z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: -90, z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f },
+      { x: 90,  z: -26,  r: 42, h: 28, yaw: 1.52, sx: 0.92, sz: 1.25, ridges: 4, twist: 0.25, hasSnow: false, rockHigh: 0x5a687c, rockMid: 0x3d4a5c, rockLow: 0x2d3748 },
+      { x: 90,  z: 36,   r: 42, h: 27, yaw: 1.62, sx: 0.92, sz: 1.25, ridges: 4, twist: -0.25, hasSnow: false, rockHigh: 0x526071, rockMid: 0x364353, rockLow: 0x28323f }
     ];
-    midCrags.forEach(mc => createSweepingMountain(mc.x, mc.z, mc.r, mc.h, mc.yaw, mc.sx, mc.sz, mc.mat, false));
+    midCrags.forEach(mc => createSweepingMassif(mc, false));
 
-    // 3. ROLLING ALPINE FOOTHILLS WITH NATURAL SLOPE AND TRANSITION CLUSTERS
-    // Matches Reference Board 2 (Grassy Foothills):
-    // - Gentle green slope mounds
-    // - Natural boulder and stone clusters at foothill skirt
-    // - Wildflower patches softening meadow-to-mountain boundary
+    // 3. ROLLING ALPINE FOOTHILLS WITH ORGANIC MORAINE GEOMETRY AND BOULDER SCREE
     const boulderMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.90, flatShading: true });
     const flowerYellowMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.65 });
     const flowerWhiteMat  = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.65 });
@@ -756,10 +1006,9 @@ export class World {
       const fr = isNorth ? 20 + (f % 3) * 3 : 24 + (f % 3) * 3;
       const fh = 11 + (f % 2) * 3.5;
 
-      const hillGeo = new THREE.ConeGeometry(fr, fh, 7);
-      hillGeo.scale(1.15, 1.0, isNorth ? 0.78 : 0.88);
-      const hillMesh = new THREE.Mesh(hillGeo, foothillMat);
-      hillMesh.position.set(fx, fh / 2, fz);
+      const hillGeo = this.buildMoraineFoothillGeo(fr, fh, 16, 8, isNorth);
+      const hillMesh = new THREE.Mesh(hillGeo, foothillMoraineMat);
+      hillMesh.position.set(fx, 0, fz);
       hillMesh.rotation.y = angle + 0.3;
       hillMesh.receiveShadow = true;
       this.scene.add(hillMesh);
@@ -791,6 +1040,7 @@ export class World {
         this.scene.add(bGroup);
       }
     }
+
 
     // 4. IMPENETRABLE VALLEY PERIMETER BOUNDARY WALLS
     // Prevents player from climbing mountains, glitching into rocks, or leaving playable valley floor
@@ -2047,53 +2297,247 @@ export class World {
   }
 
   /**
-   * Layered 3D Grass Tufts, Wildflowers, and Low-Poly Shrubbery
+   * Generates a multi-blade tapered grass cluster with vertex-baked root-to-tip colors.
    */
-  buildVegetationLayers() {
-    const grassBladeMat = this.materials.leafLight;
-    const bushMat = this.materials.bushBright;
+  buildGrassClusterGeo() {
+    const positions = [];
+    const colors = [];
+    const bladeCount = 7;
+    const cRoot = new THREE.Color(0x1a3d24);
+    const cTip = new THREE.Color(0x84cc16);
 
-    // 1. 3D Grass Blade Tufts
-    const tuftLocations = [];
-    for (let i = 0; i < 110; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 4 + Math.random() * 46;
-      const x = Math.cos(angle) * dist;
-      const z = Math.sin(angle) * dist;
+    for (let b = 0; b < bladeCount; b++) {
+      const angle = (b / bladeCount) * Math.PI * 2 + (Math.sin(b * 1.7) * 0.2);
+      const h = 0.45 + (b % 3) * 0.08;
+      const lean = 0.14 + (b % 2) * 0.06;
+      const baseW = 0.035;
 
-      if (Math.abs(x) < 23 && Math.abs(z + 14) < 6) continue;
-      if (Math.abs(x) < 23 && Math.abs(z - 16) < 6) continue;
-      if (Math.abs(x) < 2.4 && Math.abs(z) < 32) continue;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const perpX = -sinA * baseW;
+      const perpZ = cosA * baseW;
 
-      tuftLocations.push({ x, z, scale: 0.65 + Math.random() * 0.6 });
+      const baseOffset = 0.025;
+      const bx = cosA * baseOffset;
+      const bz = sinA * baseOffset;
+
+      const tx = bx + cosA * lean;
+      const ty = h;
+      const tz = bz + sinA * lean;
+
+      positions.push(bx + perpX, 0.0, bz + perpZ);
+      colors.push(cRoot.r, cRoot.g, cRoot.b);
+
+      positions.push(bx - perpX, 0.0, bz - perpZ);
+      colors.push(cRoot.r, cRoot.g, cRoot.b);
+
+      positions.push(tx, ty, tz);
+      colors.push(cTip.r, cTip.g, cTip.b);
     }
 
-    // 1. 3D Grass Blade Tufts (Instanced for high-performance rendering)
-    const bladeGeo = new THREE.ConeGeometry(0.06, 0.55, 4);
-    const totalBlades = tuftLocations.length * 5;
-    const instancedGrass = new THREE.InstancedMesh(bladeGeo, grassBladeMat, totalBlades);
-    instancedGrass.receiveShadow = true;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
 
+  /**
+   * Generates a stylized wildflower geometry with green stem and colored blossom petals.
+   */
+  buildFlowerGeo(petalColorHex) {
+    let stemGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.30, 4);
+    stemGeo.translate(0, 0.15, 0);
+    stemGeo = stemGeo.toNonIndexed();
+
+    let blossomGeo = new THREE.CylinderGeometry(0.08, 0.04, 0.05, 6);
+    blossomGeo.translate(0, 0.32, 0);
+    blossomGeo = blossomGeo.toNonIndexed();
+
+    const posStem = stemGeo.getAttribute('position');
+    const posBlossom = blossomGeo.getAttribute('position');
+    const totalCount = posStem.count + posBlossom.count;
+
+    const positions = new Float32Array(totalCount * 3);
+    const colors = new Float32Array(totalCount * 3);
+    const cStem = new THREE.Color(0x2e7d32);
+    const cPetal = new THREE.Color(petalColorHex);
+
+    for (let i = 0; i < posStem.count; i++) {
+      positions[i * 3] = posStem.getX(i);
+      positions[i * 3 + 1] = posStem.getY(i);
+      positions[i * 3 + 2] = posStem.getZ(i);
+      colors[i * 3] = cStem.r;
+      colors[i * 3 + 1] = cStem.g;
+      colors[i * 3 + 2] = cStem.b;
+    }
+    const offset = posStem.count;
+    for (let i = 0; i < posBlossom.count; i++) {
+      const idx = (offset + i) * 3;
+      positions[idx] = posBlossom.getX(i);
+      positions[idx + 1] = posBlossom.getY(i);
+      positions[idx + 2] = posBlossom.getZ(i);
+      colors[idx] = cPetal.r;
+      colors[idx + 1] = cPetal.g;
+      colors[idx + 2] = cPetal.b;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  /**
+   * Layered 3D Grass Tufts, Wildflowers, and Low-Poly Shrubbery
+   * Upgraded with 1,400 multi-blade tapered grass clusters driven by onBeforeCompile GPU wind sway,
+   * 280 instanced alpine wildflowers, weathered river stones, and handcrafted Blender shrub bushes.
+   */
+  buildVegetationLayers() {
+    let seed = 1234567;
+    const pseudoRandom = () => {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    // 1. GPU-Animated 3D Grass Clusters (1,400 multi-blade tapered clusters)
+    const grassLocations = [];
+    let attempts = 0;
+    while (grassLocations.length < 1400 && attempts < 10000) {
+      attempts++;
+      const x = (pseudoRandom() - 0.5) * 84;
+      const z = (pseudoRandom() - 0.5) * 80 + 1;
+      if (!this.isTreePositionValid(x, z, 1.2)) continue;
+      const y = this.getGroundElevation(x, z);
+      grassLocations.push({
+        x, y, z,
+        rotY: pseudoRandom() * Math.PI * 2,
+        scale: 0.75 + pseudoRandom() * 0.45
+      });
+    }
+
+    const grassGeo = this.buildGrassClusterGeo();
+    const grassClusterMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.82,
+      side: THREE.DoubleSide
+    });
+
+    grassClusterMat.onBeforeCompile = (shader) => {
+      shader.uniforms.uTime = this.grassWindUniforms.uTime;
+      shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        float heightFactor = clamp(transformed.y * 1.8, 0.0, 1.0);
+        heightFactor = heightFactor * heightFactor;
+        #ifdef USE_INSTANCEMATRIX
+          vec4 worldInstancePos = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          float wave = sin(uTime * 2.2 + worldInstancePos.x * 0.35 + worldInstancePos.z * 0.28);
+          float waveGust = cos(uTime * 1.4 + worldInstancePos.x * 0.15 - worldInstancePos.z * 0.45);
+        #else
+          float wave = sin(uTime * 2.2 + position.x * 0.35 + position.z * 0.28);
+          float waveGust = cos(uTime * 1.4 + position.x * 0.15 - position.z * 0.45);
+        #endif
+        float windDisplacement = (wave * 0.12 + waveGust * 0.06) * heightFactor;
+        transformed.x += windDisplacement;
+        transformed.z += windDisplacement * 0.65;
+        `
+      );
+    };
+
+    const instancedGrass = new THREE.InstancedMesh(grassGeo, grassClusterMat, grassLocations.length);
+    instancedGrass.receiveShadow = true;
     const dummyG = new THREE.Object3D();
-    let gIdx = 0;
-    tuftLocations.forEach(tl => {
-      for (let b = 0; b < 5; b++) {
-        const rotY = (b / 5) * Math.PI * 2;
-        dummyG.position.set(
-          tl.x + Math.cos(rotY) * 0.08,
-          0.02 + 0.28 * tl.scale,
-          tl.z + Math.sin(rotY) * 0.08
-        );
-        dummyG.rotation.set(0, rotY, 0.24);
-        dummyG.scale.set(tl.scale, tl.scale, tl.scale);
-        dummyG.updateMatrix();
-        instancedGrass.setMatrixAt(gIdx++, dummyG.matrix);
-      }
+    grassLocations.forEach((loc, idx) => {
+      dummyG.position.set(loc.x, loc.y, loc.z);
+      dummyG.rotation.set(0, loc.rotY, 0);
+      dummyG.scale.set(loc.scale, loc.scale, loc.scale);
+      dummyG.updateMatrix();
+      instancedGrass.setMatrixAt(idx, dummyG.matrix);
     });
     instancedGrass.instanceMatrix.needsUpdate = true;
     this.scene.add(instancedGrass);
 
-    // 2. Handcrafted Blender Alpine Shrubbery & Currant Bushes
+    // 2. Instanced Wildflowers (Alpine Poppies, Golden Buttercups, Meadow Lavender)
+    const flowerTypes = [
+      { name: 'poppy', color: 0xef4444, count: 95 },
+      { name: 'buttercup', color: 0xfacc15, count: 95 },
+      { name: 'lavender', color: 0xa855f7, count: 90 }
+    ];
+
+    const flowerMat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.70,
+      metalness: 0.05
+    });
+
+    flowerTypes.forEach(ft => {
+      const flowerGeo = this.buildFlowerGeo(ft.color);
+      const flowerLocs = [];
+      let fAttempts = 0;
+      while (flowerLocs.length < ft.count && fAttempts < 5000) {
+        fAttempts++;
+        const x = (pseudoRandom() - 0.5) * 82;
+        const z = (pseudoRandom() - 0.5) * 78 + 1;
+        if (!this.isTreePositionValid(x, z, 1.2)) continue;
+        const y = this.getGroundElevation(x, z);
+        flowerLocs.push({
+          x, y, z,
+          rotY: pseudoRandom() * Math.PI * 2,
+          scale: 0.75 + pseudoRandom() * 0.45
+        });
+      }
+
+      const instancedFlowers = new THREE.InstancedMesh(flowerGeo, flowerMat, flowerLocs.length);
+      instancedFlowers.receiveShadow = true;
+      const dummyF = new THREE.Object3D();
+      flowerLocs.forEach((fl, idx) => {
+        dummyF.position.set(fl.x, fl.y, fl.z);
+        dummyF.rotation.set(0, fl.rotY, 0);
+        dummyF.scale.set(fl.scale, fl.scale, fl.scale);
+        dummyF.updateMatrix();
+        instancedFlowers.setMatrixAt(idx, dummyF.matrix);
+      });
+      instancedFlowers.instanceMatrix.needsUpdate = true;
+      this.scene.add(instancedFlowers);
+    });
+
+    // 3. Weathered Meadow Fieldstones & River Pebbles (90 instances)
+    const pebbleGeo = new THREE.DodecahedronGeometry(0.20, 1);
+    pebbleGeo.scale(1.4, 0.45, 1.1);
+    const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.90, flatShading: true });
+    const pebbleLocs = [];
+    let pAttempts = 0;
+    while (pebbleLocs.length < 90 && pAttempts < 4000) {
+      pAttempts++;
+      const x = (pseudoRandom() - 0.5) * 82;
+      const z = (pseudoRandom() - 0.5) * 78 + 1;
+      if (!this.isTreePositionValid(x, z, 1.2)) continue;
+      const y = this.getGroundElevation(x, z);
+      pebbleLocs.push({
+        x, y: y + 0.08, z,
+        rotY: pseudoRandom() * Math.PI * 2,
+        scale: 0.70 + pseudoRandom() * 0.60
+      });
+    }
+
+    const instancedPebbles = new THREE.InstancedMesh(pebbleGeo, pebbleMat, pebbleLocs.length);
+    instancedPebbles.receiveShadow = true;
+    const dummyP = new THREE.Object3D();
+    pebbleLocs.forEach((pl, idx) => {
+      dummyP.position.set(pl.x, pl.y, pl.z);
+      dummyP.rotation.set(0, pl.rotY, 0);
+      dummyP.scale.set(pl.scale, pl.scale, pl.scale);
+      dummyP.updateMatrix();
+      instancedPebbles.setMatrixAt(idx, dummyP.matrix);
+    });
+    instancedPebbles.instanceMatrix.needsUpdate = true;
+    this.scene.add(instancedPebbles);
+
+    // 4. Handcrafted Blender Alpine Shrubbery & Currant Bushes (Preserved from Stage 1)
     const bushPlacements = [
       // Terrace flanking bushes (framing the farmhouse garden and stone retaining wall)
       { x: -7.5, z: -25.5, s: 1.15 },
@@ -2148,13 +2592,23 @@ export class World {
   }
 
   update(dt, totalTime) {
-    // 1. Drifting cumulus clouds across blue sky
+    // 0. Update meadow grass GPU wind sway time uniform
+    if (this.grassWindUniforms && this.grassWindUniforms.uTime) {
+      this.grassWindUniforms.uTime.value = totalTime;
+    }
+
+    // 1. Drifting cumulus clouds across blue sky with gentle vertical bobbing
     for (const c of this.clouds) {
       c.group.position.x += c.speed * dt * 2.0;
       if (c.group.position.x > 175) {
         c.group.position.x = -175;
       }
+      if (c.baseY !== undefined) {
+        c.group.position.y = c.baseY + Math.sin(totalTime * 0.35 + c.phase) * 1.4;
+      }
     }
+
+
 
     // 2. Fruit regrowth on trees & subtle leaf wind sway
     for (const t of this.fruitTrees) {
