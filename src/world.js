@@ -1487,6 +1487,137 @@ export class World {
     }).catch(err => {
       console.warn('[World] Failed to load farmhouse_interior.glb, using fallback proxy', err);
     });
+
+    // Also build accessible Outdoor Harvest Storage Chest on Homestead Terrace Porch (x: 2.5, y: 0.60, z: -25.4)
+    // Shared with this.chestItems so both player and farm workers can deposit/inspect farm storage outdoors
+    this.buildPorchStorageChest(2.5, 0.60, -25.4);
+  }
+
+  getInitialChestItems() {
+    return [
+      { id: 'seed_carrot', name: 'Carrot Seeds', icon: '🌱', count: 4 },
+      { id: 'seed_wheat', name: 'Wheat Seeds', icon: '🌱', count: 4 },
+      { id: 'seed_pumpkin', name: 'Pumpkin Seeds', icon: '🌱', count: 2 },
+      { id: 'seed_tomato', name: 'Tomato Seeds', icon: '🌱', count: 2 },
+      { id: 'apple', name: 'Fresh Apple', icon: '🍎', count: 3 }
+    ];
+  }
+
+  resetChestItems() {
+    this.chestItems = this.getInitialChestItems();
+    window.dispatchEvent(new CustomEvent('storage:updated', { detail: { chest: this.chestItems } }));
+  }
+
+  getStorageCount(itemId) {
+    if (!Array.isArray(this.chestItems)) return 0;
+    const found = this.chestItems.find(it => it.id === itemId);
+    return found ? found.count : 0;
+  }
+
+  /**
+   * Authoritatively deposits produce/items into the shared Farm Storage Chest (this.chestItems)
+   */
+  depositToStorage(itemId, amount = 1, itemName = null, itemIcon = null) {
+    if (!itemId || amount <= 0) return false;
+    if (!Array.isArray(this.chestItems)) {
+      this.chestItems = this.getInitialChestItems();
+    }
+
+    const META = {
+      apple: { name: 'Fresh Apple', icon: '🍎' },
+      carrot: { name: 'Farm Carrot', icon: '🥕' },
+      wheat: { name: 'Golden Wheat', icon: '🌾' },
+      pumpkin: { name: 'Country Pumpkin', icon: '🎃' },
+      tomato: { name: 'Juicy Tomato', icon: '🍅' },
+      seed_carrot: { name: 'Carrot Seeds', icon: '🌱' },
+      seed_wheat: { name: 'Wheat Seeds', icon: '🌱' },
+      seed_pumpkin: { name: 'Pumpkin Seeds', icon: '🌱' },
+      seed_tomato: { name: 'Tomato Seeds', icon: '🌱' }
+    };
+
+    const existing = this.chestItems.find(it => it.id === itemId);
+    if (existing) {
+      existing.count += amount;
+    } else {
+      if (this.chestItems.length >= 16) return false;
+      const meta = META[itemId] || { name: itemName || itemId, icon: itemIcon || '📦' };
+      this.chestItems.push({
+        id: itemId,
+        name: itemName || meta.name,
+        icon: itemIcon || meta.icon,
+        count: amount
+      });
+    }
+
+    window.dispatchEvent(new CustomEvent('storage:updated', {
+      detail: { chest: this.chestItems, itemId, amount }
+    }));
+    return true;
+  }
+
+  /**
+   * Builds a rustic wooden Farm Storage Chest on the Homestead Terrace beside the Farmhouse stairs
+   * so farm workers can physically deliver harvested produce to farm storage and players can inspect it.
+   */
+  buildPorchStorageChest(x, y, z) {
+    const chestGroup = new THREE.Group();
+    chestGroup.position.set(x, y, z);
+
+    const woodMat = this.materials.wood;
+    const logMat = this.materials.timberLog;
+    const ironMat = this.materials.ironMetal;
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.35, metalness: 0.65 });
+
+    // Chest base box
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.52, 0.68), woodMat);
+    body.position.set(0, 0.26, 0);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    chestGroup.add(body);
+
+    // Iron corner bands
+    [-0.48, 0.48].forEach(bx => {
+      const band = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.53, 0.70), ironMat);
+      band.position.set(bx, 0.26, 0);
+      chestGroup.add(band);
+    });
+
+    // Brass front clasp
+    const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.14, 0.04), brassMat);
+    clasp.position.set(0, 0.46, 0.345);
+    chestGroup.add(clasp);
+
+    // Hinged lid at back edge (y = 0.52, z = -0.34)
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0, 0.52, -0.33);
+    chestGroup.add(lidPivot);
+    this.porchChestLid = lidPivot;
+
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.14, 0.72), logMat);
+    lid.position.set(0, 0.07, 0.33);
+    lid.castShadow = true;
+    lid.receiveShadow = true;
+    lidPivot.add(lid);
+
+    this.scene.add(chestGroup);
+    this.storageDeliveryPoint = new THREE.Vector3(x - 0.55, y, z + 0.85);
+    this.storageChestPosition = new THREE.Vector3(x, y, z);
+
+    // Register interactable so player can also open Farm Storage directly on the terrace
+    this.interactables.push({
+      id: 'farm_porch_chest',
+      mesh: body,
+      name: 'Farm Storage Chest',
+      prompt: 'Open Farm Storage',
+      ready: true,
+      interact: () => {
+        if (this.porchChestLid) {
+          this.porchChestLid.rotation.x = -Math.PI / 3.2;
+        }
+        sounds.playInteract();
+        window.dispatchEvent(new CustomEvent('storage:open', { detail: { chest: this.chestItems } }));
+      }
+    });
   }
 
   restoreHouseState(data) {

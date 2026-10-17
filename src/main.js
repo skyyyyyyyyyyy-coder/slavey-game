@@ -37,7 +37,7 @@ const world = new World(scene, collisionWorld, particleManager);
 const timeManager = new TimeManager();
 const dayNightCycle = new DayNightCycle(scene, timeManager, world, renderer);
 const farmingManager = new FarmingManager(scene, collisionWorld, particleManager, timeManager);
-const workerManager = new WorkerManager(scene, world, collisionWorld, particleManager);
+const workerManager = new WorkerManager(scene, world, collisionWorld, particleManager, farmingManager);
 world.timeManager = timeManager;
 
 window.assetPipeline = assetPipeline;
@@ -444,11 +444,20 @@ function closeStorageModal() {
   if (world.interiorChestLid) {
     world.interiorChestLid.rotation.x = 0;
   }
+  if (world.porchChestLid) {
+    world.porchChestLid.rotation.x = 0;
+  }
   lockPointer();
 }
 
 window.addEventListener('storage:open', () => {
   openStorageModal();
+});
+
+window.addEventListener('storage:updated', () => {
+  if (storageModal && !storageModal.classList.contains('hidden')) {
+    renderStorageUI();
+  }
 });
 
 if (btnCloseStorage) {
@@ -524,11 +533,14 @@ function startNewGame() {
   // Clean farming state
   farmingManager.tiles.forEach(tile => farmingManager.farmingGroup.remove(tile.soilGroup));
   farmingManager.tiles.clear();
+  farmingManager.reservedTiles.clear();
   farmingManager.activeToolIndex = 0;
   farmingManager.selectedCropId = 'carrot';
   farmingManager.wateringCanCurrent = 12;
   farmingManager.tutorial = { step: 1, completed: false, skipped: false };
   farmingManager.createDemoField();
+  world.resetChestItems();
+  workerManager.resetWorkers();
 
   isGameStarted = true;
   startOverlay.classList.add('hidden');
@@ -603,6 +615,7 @@ document.addEventListener('pointerlockchange', () => {
     if (storageModal) {
       storageModal.classList.add('hidden');
       if (world.interiorChestLid) world.interiorChestLid.rotation.x = 0;
+      if (world.porchChestLid) world.porchChestLid.rotation.x = 0;
     }
     timeManager.resume();
   } else {

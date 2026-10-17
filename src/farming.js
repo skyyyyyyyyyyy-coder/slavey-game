@@ -99,6 +99,9 @@ export class FarmingManager {
     this.soilTemplate = null;
     this.carrotStageTemplates = new Map(); // 1, 2, 3, 4 -> mesh template
 
+    // Tile Reservation Registry for NPC Farm Workers (tileKey -> workerId)
+    this.reservedTiles = new Map();
+
     // Shared Materials
     this.initMaterials();
 
@@ -820,16 +823,41 @@ export class FarmingManager {
     return true;
   }
 
-  /**
-   * Water tilled soil or crop
-   */
-  waterTile(tile, player) {
-    if (!tile || tile.isWatered) return false;
-    if (this.wateringCanCurrent <= 0) return false;
+  // ===========================================================================
+  // TILE RESERVATION HELPERS (Shared between Player & FarmWorker NPCs)
+  // ===========================================================================
+  isTileAvailableFor(tileKey, workerId) {
+    if (!this.reservedTiles.has(tileKey)) return true;
+    return this.reservedTiles.get(tileKey) === workerId;
+  }
 
-    // Drain stamina and water charge
-    player.stamina = Math.max(0, player.stamina - 4);
-    this.wateringCanCurrent = Math.max(0, this.wateringCanCurrent - 1);
+  reserveTile(tileKey, workerId) {
+    if (!this.isTileAvailableFor(tileKey, workerId)) return false;
+    this.reservedTiles.set(tileKey, workerId);
+    return true;
+  }
+
+  releaseTile(tileKey, workerId = null) {
+    if (!this.reservedTiles.has(tileKey)) return;
+    if (workerId === null || this.reservedTiles.get(tileKey) === workerId) {
+      this.reservedTiles.delete(tileKey);
+    }
+  }
+
+  releaseAllForWorker(workerId) {
+    for (const [key, owner] of this.reservedTiles.entries()) {
+      if (owner === workerId) {
+        this.reservedTiles.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Shared authoritative soil watering operation used by both Player and FarmWorker NPCs.
+   * Updates tile moisture state, soil mesh materials, audio, and water splash particles.
+   */
+  applyWaterToTile(tile, { actor = 'player' } = {}) {
+    if (!tile || !tile.isTilled || tile.isWatered) return false;
 
     tile.isWatered = true;
     if (tile.soilMesh) {
@@ -845,13 +873,48 @@ export class FarmingManager {
       this.particles.emitWaterSplash(new THREE.Vector3(tile.gx, 0.08, tile.gz));
     }
 
-    // Advance tutorial step 6
+    this.releaseTile(tile.key);
+    events.emit('farming:watered', { gx: tile.gx, gz: tile.gz, actor, waterLeft: this.wateringCanCurrent });
+    return true;
+  }
+
+  /**
+   * Player entrypoint: Water tilled soil or crop
+   */
+  waterTile(tile, player) {
+    if (!tile || tile.isWatered) return false;
+    if (this.wateringCanCurrent <= 0) return false;
+
+    // Drain player stamina and player watering can charge
+    player.stamina = Math.max(0, player.stamina - 4);
+    this.wateringCanCurrent = Math.max(0, this.wateringCanCurrent - 1);
+
+    this.applyWaterToTile(tile, { actor: 'player' });
+
+    // Advance tutorial step 6 (player actions only)
     if (this.tutorial.step === 6) {
       this.advanceTutorial(7);
     }
 
-    events.emit('farming:watered', { gx: tile.gx, gz: tile.gz, waterLeft: this.wateringCanCurrent });
     return true;
+  }
+
+  /**
+   * NPC FarmWorker entrypoint: Water dry planted crop tile using the worker's own
+   * watering can and energy without draining player stamina or altering tutorial state.
+   */
+  npcWaterTile(tile, worker) {
+    if (!tile || !tile.isTilled || !tile.crop || tile.isWatered) return false;
+    if (!worker || worker.waterCurrent <= 0 || worker.energy <= 0) return false;
+
+    worker.waterCurrent = Math.max(0, worker.waterCurrent - 1);
+    if (typeof worker.consumeEnergy === 'function') {
+      worker.consumeEnergy(4);
+    } else {
+      worker.energy = Math.max(0, worker.energy - 4);
+    }
+
+    return this.applyWaterToTile(tile, { actor: worker.id || 'npc' });
   }
 
   /**
@@ -897,29 +960,32 @@ export class FarmingManager {
   }
 
   /**
-   * Harvest ripe Stage 4 crop
+   * Shared authoritative crop harvest extraction used by both Player and FarmWorker NPCs.
+   * Validates Stage 4 maturity, plays particles/audio, updates regrowing vs single-harvest
+   * crop state on the tile, and returns the harvested yield descriptor.
    */
-  harvestCrop(tile, player) {
-    if (!tile || !tile.crop || tile.crop.stage !== 4) return false;
+  extractHarvestFromTile(tile, { actor = 'player' } = {}) {
+    if (!tile || !tile.crop || tile.crop.stage !== 4) return null;
     const cropDef = CROPS[tile.crop.type];
-    if (!cropDef) return false;
+    if (!cropDef) return null;
 
-    // Add produce to backpack
-    player.addToBackpack(cropDef.id, cropDef.yield);
-    player.stamina = Math.max(0, player.stamina - (cropDef.staminaHarvest || 2));
+    const result = {
+      cropId: cropDef.id,
+      name: cropDef.name,
+      icon: cropDef.icon,
+      count: cropDef.yield,
+      staminaCost: cropDef.staminaHarvest || 2
+    };
 
     sounds.playInteract();
     if (this.particles) {
       this.particles.emitHarvestPop(new THREE.Vector3(tile.gx, 0.35, tile.gz));
     }
 
-    const msg = `${cropDef.icon} Harvested ${cropDef.yield} ${cropDef.name}!`;
-    const evt = new CustomEvent('game:message', { detail: { message: msg } });
-    window.dispatchEvent(evt);
-
     if (cropDef.regrows) {
       // Regrowing crop (Tomato): returns to Stage 2
       tile.crop.stage = 2;
+      tile.crop.visualStage = 2;
       tile.crop.daysWatered = 1;
       this.renderCropMesh(tile);
     } else {
@@ -931,13 +997,54 @@ export class FarmingManager {
       tile.crop = null;
     }
 
-    // Advance tutorial step 7 (finish)
+    this.releaseTile(tile.key);
+    events.emit('farming:harvested', { gx: tile.gx, gz: tile.gz, crop: result.cropId, yield: result.count, actor });
+    return result;
+  }
+
+  /**
+   * Player entrypoint: Harvest ripe Stage 4 crop into player backpack
+   */
+  harvestCrop(tile, player) {
+    const res = this.extractHarvestFromTile(tile, { actor: 'player' });
+    if (!res) return false;
+
+    // Add produce to player backpack & drain player stamina
+    player.addToBackpack(res.cropId, res.count);
+    player.stamina = Math.max(0, player.stamina - res.staminaCost);
+
+    const msg = `${res.icon} Harvested ${res.count} ${res.name}!`;
+    const evt = new CustomEvent('game:message', { detail: { message: msg } });
+    window.dispatchEvent(evt);
+
+    // Advance tutorial step 7 (player actions only)
     if (this.tutorial.step === 7) {
       this.completeTutorial();
     }
 
-    events.emit('farming:harvested', { crop: cropDef.id, yield: cropDef.yield });
     return true;
+  }
+
+  /**
+   * NPC FarmWorker entrypoint: Harvest ripe Stage 4 crop into the worker's carried
+   * produce bundle (for delivery to farm storage) without touching player inventory,
+   * player stamina, or tutorial progression.
+   */
+  npcHarvestTile(tile, worker) {
+    if (!worker || worker.energy <= 0) return null;
+    const res = this.extractHarvestFromTile(tile, { actor: worker.id || 'npc' });
+    if (!res) return null;
+
+    if (typeof worker.consumeEnergy === 'function') {
+      worker.consumeEnergy(res.staminaCost);
+    } else {
+      worker.energy = Math.max(0, worker.energy - res.staminaCost);
+    }
+
+    if (typeof worker.addCarriedProduce === 'function') {
+      worker.addCarriedProduce(res.cropId, res.count, res.name, res.icon);
+    }
+    return res;
   }
 
   /**
@@ -947,6 +1054,7 @@ export class FarmingManager {
     if (!tile) return false;
     player.stamina = Math.max(0, player.stamina - 5);
 
+    this.releaseTile(tile.key);
     if (tile.cropGroup) {
       tile.soilGroup.remove(tile.cropGroup);
       tile.cropGroup = null;
