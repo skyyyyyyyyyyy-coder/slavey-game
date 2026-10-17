@@ -293,6 +293,11 @@ export class World {
     this.smokeParticles = [];
     this.grassWindUniforms = { uTime: { value: 0 } };
 
+    // NPC navigation data (consumed by src/workers.js): authoritative paddock/gate layout
+    // and footprints of props that have no physics collider (fences, carts, crates, signs...)
+    this.paddocks = [];     // { x, z, w, d, gate: { x, z, halfWidth, side: 'south' } }
+    this.navObstacles = []; // { type: 'circle'|'obb', x, z, r | hw, hd, rot }
+
     // Stylized materials with smooth organic shading and cohesive art direction
     this.materials = {
       trunk: new THREE.MeshStandardMaterial({ color: 0x54371e, roughness: 0.85, flatShading: false }),
@@ -1508,6 +1513,10 @@ export class World {
     const logMat = this.materials.timberLog;
 
     const buildPaddock = (x, z, w, d, title, icon) => {
+      // Gate = the central opening left between the two south fence segments at +/-4.2m
+      this.paddocks.push({ x, z, w, d, gate: { x, z: z + d / 2, halfWidth: 2.35, side: 'south' } });
+      this.navObstacles.push({ type: 'obb', x: x + 1.8, z: z + d / 2 + 0.4, hw: 0.45, hd: 0.1, rot: 0 });
+
       const paddockGroup = new THREE.Group();
       paddockGroup.position.set(x, 0, z);
 

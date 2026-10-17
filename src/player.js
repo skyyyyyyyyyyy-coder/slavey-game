@@ -354,7 +354,13 @@ export class Player {
   }
 
   triggerInteraction() {
-    // 1. If targeting ripe farming crop, harvest with E
+    // 1. Prioritize hovered NPC when looking directly at a farm worker
+    if (this.hoveredInteractable && this.hoveredInteractable.isNPC && this.hoveredInteractable.ready !== false) {
+      this.hoveredInteractable.interact(this);
+      return;
+    }
+
+    // 2. If targeting ripe farming crop, harvest with E
     if (this.farmingManager && this.farmingManager.targetedTile) {
       const tile = this.farmingManager.targetedTile.existingTile;
       if (tile && tile.crop && tile.crop.stage === 4) {
@@ -363,7 +369,7 @@ export class Player {
       }
     }
 
-    // 2. Otherwise trigger hovered environmental interactable (well, tree, etc.)
+    // 3. Otherwise trigger hovered environmental interactable (well, tree, etc.)
     if (this.hoveredInteractable && this.hoveredInteractable.ready !== false) {
       this.hoveredInteractable.interact(this);
     }

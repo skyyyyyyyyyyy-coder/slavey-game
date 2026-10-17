@@ -10,6 +10,7 @@ import { saveManager } from './save.js';
 import { events } from './events.js';
 import { FarmingManager, CROPS, TOOLS } from './farming.js';
 import { assetPipeline } from './assetPipeline.js';
+import { WorkerManager } from './workers.js';
 
 // 1. Scene, Camera, Renderer Setup
 const container = document.getElementById('canvas-container');
@@ -36,6 +37,7 @@ const world = new World(scene, collisionWorld, particleManager);
 const timeManager = new TimeManager();
 const dayNightCycle = new DayNightCycle(scene, timeManager, world, renderer);
 const farmingManager = new FarmingManager(scene, collisionWorld, particleManager, timeManager);
+const workerManager = new WorkerManager(scene, world, collisionWorld, particleManager);
 world.timeManager = timeManager;
 
 window.assetPipeline = assetPipeline;
@@ -76,6 +78,7 @@ window.camera = camera;
 window.timeManager = timeManager;
 window.dayNightCycle = dayNightCycle;
 window.farmingManager = farmingManager;
+window.workerManager = workerManager;
 window.CROPS = CROPS;
 window.TOOLS = TOOLS;
 window.saveManager = saveManager;
@@ -806,22 +809,32 @@ function animate() {
   saveManager.update(dt);
 
   // Update Game Entities
+  workerManager.update(dt, totalTime, player);
   player.update(dt, world.interactables);
+  for (const w of workerManager.workers) {
+    w.resolvePlayerCollision(player);
+  }
   world.update(dt, totalTime);
   particleManager.update(dt);
 
   // Update Farming Grid Targeting
   farmingManager.updateTargeting(player);
 
-  // Update Reticle & Interaction Prompt
-  if (farmingManager.targetedTile && farmingManager.targetedTile.promptText) {
+  // Update Reticle & Interaction Prompt (prioritize hovered NPC when looking directly at Caleb)
+  if (player.hoveredInteractable && player.hoveredInteractable.isNPC && player.hoveredInteractable.ready !== false) {
+    if (farmingManager.selectorMesh) farmingManager.selectorMesh.visible = false;
+    if (farmingManager.selectorBorder) farmingManager.selectorBorder.visible = false;
+    reticle.classList.add('hover');
+    interactPrompt.classList.remove('hidden');
+    interactText.textContent = player.hoveredInteractable.customPrompt || `— ${player.hoveredInteractable.prompt}`;
+  } else if (farmingManager.targetedTile && farmingManager.targetedTile.promptText) {
     reticle.classList.add('hover');
     interactPrompt.classList.remove('hidden');
     interactText.textContent = farmingManager.targetedTile.promptText;
   } else if (player.hoveredInteractable && player.hoveredInteractable.ready !== false) {
     reticle.classList.add('hover');
     interactPrompt.classList.remove('hidden');
-    interactText.textContent = `${player.hoveredInteractable.prompt} [${player.hoveredInteractable.name}]`;
+    interactText.textContent = player.hoveredInteractable.customPrompt || `${player.hoveredInteractable.prompt} [${player.hoveredInteractable.name}]`;
   } else {
     reticle.classList.remove('hover');
     interactPrompt.classList.add('hidden');

@@ -170,7 +170,7 @@ body, html {
 /* TOAST MESSAGES */
 #toast-container {
   position: absolute;
-  top: 14%;
+  top: 148px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -178,6 +178,7 @@ body, html {
   gap: 8px;
   align-items: center;
   pointer-events: none;
+  z-index: 30;
 }
 
 .toast {
